@@ -1,0 +1,50 @@
+{
+	"warm-mahogany": {
+		"bg": "#2b221d",
+		"sep": "#5a4a40",
+		"model": "#b5826f",
+		"path": "#c4a050",
+		"gitClean": "#6a7c5d",
+		"gitDirty": "#d4a574",
+		"staged": "#87875f",
+		"dirty": "#af875f",
+		"untracked": "#d7af5f",
+		"spend": "#b5826f",
+		"output": "#af8787",
+		"cost": "#af8787",
+		"context": "#8a7566",
+		"subagents": "#c4a050"
+	},
+	"warm-gruvbox": {
+		"bg": "#1d2021",
+		"sep": "#665c54",
+		"model": "#d3869b",
+		"path": "#8ec07c",
+		"gitClean": "#98971a",
+		"gitDirty": "#d79921",
+		"staged": "#98971a",
+		"dirty": "#d79921",
+		"untracked": "#83a598",
+		"spend": "#8ec07c",
+		"output": "#d3869b",
+		"cost": "#d3869b",
+		"context": "#83a598",
+		"subagents": "#fe8019"
+	},
+	"warm-sand": {
+		"bg": "#efe4d0",
+		"sep": "#8d6e63",
+		"model": "#a85a00",
+		"path": "#1565c0",
+		"gitClean": "#2e7d32",
+		"gitDirty": "#a86f00",
+		"staged": "#008700",
+		"dirty": "#b35900",
+		"untracked": "#0277bd",
+		"spend": "#00838f",
+		"output": "#ad1457",
+		"cost": "#6d4c41",
+		"context": "#5d4037",
+		"subagents": "#a85a00"
+	}
+}

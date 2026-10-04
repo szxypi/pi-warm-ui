@@ -1,6 +1,6 @@
 # pi-warm-ui
 
-给 [pi coding agent](https://github.com/earendil-works/pi) 用的暖色低眩光主题，并让对话区更清爽：紧凑的工具行、易读的子代理运行记录、彩色的单行状态栏。
+给 [pi coding agent](https://github.com/earendil-works/pi) 用的暖色低眩光主题，并让对话区更清爽：五个暖色主题、紧凑的工具行、易读的子代理运行记录，以及仿 [oh-my-pi](https://github.com/can1357/oh-my-pi) 风格的状态栏。
 
 [English](README.md)
 
@@ -10,17 +10,26 @@
 
 ![子代理运行](docs/screenshot-subagent.png)
 
+![五个主题](docs/themes.png)
+
 截图使用 `"icons": "nerd"` 和 JetBrainsMono Nerd Font。
 
 ## 包含什么
 
-**两个主题**
+**五个主题**
 
-- `eyecare-warm`：深色，暖棕底（`#262320`）。
-- `eyecare-warm-light`：浅色，暖纸底（`#F5EFE4`）。
-- 每个主题只有一个强调色：琥珀色。标题、列表符号和菜单里的选中项用它。
-- 正文在所有面板上的对比度不低于 7.9:1，次要文字不低于 4.5:1。
-- 输入框边框按思考等级从冷到暖变色：off 灰、low 蓝灰、medium 青、high 草绿、xhigh 麦黄、max 橙。
+| 主题 | 风格 | 来源 |
+|---|---|---|
+| `eyecare-warm` | 深色，暖棕（`#262320`） | 本包 |
+| `eyecare-warm-light` | 浅色，暖纸（`#F5EFE4`） | 本包 |
+| `warm-mahogany` | 深色，红木（`#181210`） | oh-my-pi `mahogany` |
+| `warm-gruvbox` | 深色，gruvbox（`#282828`） | oh-my-pi `dark-gruvbox` |
+| `warm-sand` | 浅色，米白（`#FFFAF0`） | oh-my-pi `light-sand` |
+
+- oh-my-pi 自带 100 个主题。这三个是其中对比度最好的暖色主题。它们改了名，颜色也按本包的对比度标准做了调整。
+- 标准：正文不低于 7:1；次要文字、代码、diff 和工具输出不低于 4.5:1；状态色不低于 3:1。
+- 每个主题都带一套状态栏配色（即 oh-my-pi 的 `statusLine*` 颜色），以及配套的终端配色方案。
+- 输入框边框按主题的思考等级颜色变色。
 
 **工具行**
 
@@ -52,20 +61,19 @@
 **状态栏**
 
 - 输入框下边框显示模型和思考等级。在 bash 模式（`!` 或 `!!`）下改为显示 `bash` 或 `bash · no context`。上边框保留 pi 自带的工作状态。
-- footer 只占一行，每段使用不同颜色：
+- footer 只占一行，分左右两段，参照 oh-my-pi 画成主题状态栏底色上的两枚胶囊：
 
-  | 内容 | 颜色 |
-  |---|---|
-  | 目录（上级路径暗色，当前文件夹加粗） | 蓝 |
-  | git 分支 | 紫 |
-  | 会话名 | 灰 |
-  | 输入/输出 token | 青 |
-  | 最近一次请求的缓存命中率 | 绿 |
-  | 会话费用 | 黄 |
-  | 上下文用量条 | 50% 以内绿，70% 以内黄，90% 以内橙，超过 90% 红 |
+  ```
+   ~/projects/acme-api   feat/rate-limit +1 ~1 ?1        2  617k  720   0.010  ━━━━━━── 62% of 1M 
+  ```
 
-- 设置 `"icons": "nerd"` 后，每段前面还会加 Nerd Font 图标。
-- 终端太窄时，footer 按以下顺序隐藏内容：缓存命中率、会话名、token、用量条、上下文总量、费用。
+  - 左段：目录和 git 分支。有文件改动时，分支颜色从 clean 色变成 dirty 色。`+` 是已暂存文件数，`~` 是已修改文件数，`?` 是未跟踪文件数，`▴`/`▾` 是领先和落后上游的提交数。
+  - 右段：运行中的子代理数（只在运行时显示）、会话名、输入/输出 token、最近一次请求的缓存命中率、会话费用和上下文用量条。
+  - 用量条 50% 以内绿，70% 以内黄，90% 以内橙，超过 90% 红。
+- 每段颜色取自主题的状态栏配色。没有配色的主题从它的标准颜色推导。
+- git 状态每 10 秒刷新一次，每轮对话结束后和每次 `bash`、`edit`、`write` 调用后也会刷新。它用 `git status --no-optional-locks`，不会锁住 index。
+- 设置 `"icons": "nerd"` 后，各段带 Nerd Font 图标，胶囊两端变成圆角。设置 `"statusBar": "plain"` 后不画底色，只显示彩色文字。
+- 终端太窄时，footer 按以下顺序隐藏内容：缓存命中率、会话名、git 计数、token、用量条、上下文总量、费用。
 - 扩展状态（例如 goal、plan mode）显示在第二行。没有状态时不显示这一行。
 
 ## 安装
@@ -78,10 +86,10 @@
    pi install git:github.com/szxypi/pi-warm-ui
    ```
 
-   要固定版本，就在后面加 tag：`git:github.com/szxypi/pi-warm-ui@v0.2.0`。
+   要固定版本，就在后面加 tag：`git:github.com/szxypi/pi-warm-ui@v0.3.0`。
 
 2. 启动 pi。布局立即生效。
-3. 打开 `/settings`，选择 **Theme**，再选择 `eyecare-warm` 或 `eyecare-warm-light`。
+3. 打开 `/settings`，选择 **Theme**，再从五个主题里选一个。
 4. 如果终端字体是 [Nerd Font](https://www.nerdfonts.com/)，新建 `~/.pi/agent/warm-ui.json`，写入 `{ "icons": "nerd" }`，然后运行 `/reload`。
 
 要让主题跟随终端的深浅色，在 `~/.pi/agent/settings.json` 里这样设置：
@@ -102,16 +110,19 @@ pi 不绘制终端背景。终端的背景和调色板与主题一致时效果�
 
 | 文件 | 终端 |
 |---|---|
-| `terminal/windows-terminal.json` | Windows Terminal。把两个对象复制到 `settings.json` 的 `"schemes"` 里。 |
-| `terminal/ghostty-eyecare-warm`、`terminal/ghostty-eyecare-warm-light` | Ghostty。复制到 `~/.config/ghostty/themes/`。 |
-| `terminal/kitty-eyecare-warm.conf`、`terminal/kitty-eyecare-warm-light.conf` | kitty。在 `kitty.conf` 里加 `include <文件>`。 |
+| `terminal/windows-terminal.json` | Windows Terminal。把需要的对象复制到 `settings.json` 的 `"schemes"` 里。 |
+| `terminal/ghostty-<主题>` | Ghostty。复制到 `~/.config/ghostty/themes/`。 |
+| `terminal/kitty-<主题>.conf` | kitty。在 `kitty.conf` 里加 `include <文件>`。 |
 
 其他终端按下表设置核心颜色：
 
-| 配色 | 背景 | 前景 | 光标 | 选区 |
-|---|---|---|---|---|
-| EyeCare Warm | `#262320` | `#D3CBBF` | `#E2B86A` | `#4A443C` |
-| EyeCare Warm Light | `#F5EFE4` | `#3B352E` | `#93600F` | `#DCD0BC` |
+| 配色 | 背景 | 前景 |
+|---|---|---|
+| EyeCare Warm | `#262320` | `#D3CBBF` |
+| EyeCare Warm Light | `#F5EFE4` | `#3B352E` |
+| Warm Mahogany | `#181210` | `#ECE4D8` |
+| Warm Gruvbox | `#282828` | `#EBDBB2` |
+| Warm Sand | `#FFFAF0` | `#3E2723` |
 
 16 个 ANSI 颜色见 `terminal/windows-terminal.json`。
 
@@ -126,7 +137,8 @@ pi 启动时和运行 `/reload` 时，扩展读取 `~/.pi/agent/warm-ui.json`。
   "hideStatuses": ["pi-code-status"],
   "tools": true,
   "userMessages": true,
-  "icons": "unicode"
+  "icons": "unicode",
+  "statusBar": "band"
 }
 ```
 
@@ -138,6 +150,7 @@ pi 启动时和运行 `/reload` 时，扩展读取 `~/.pi/agent/warm-ui.json`。
 | `tools` | 设为 `false` 时保留 pi 自带的工具框，包括子代理运行。 |
 | `userMessages` | 设为 `false` 时去掉用户消息的竖条。 |
 | `icons` | `"nerd"` 使用 Nerd Font 图标。`"unicode"` 使用普通符号和短标签。`"none"` 只用标签。 |
+| `statusBar` | `"band"` 在主题的状态栏底色上画 footer。`"plain"` 只显示彩色文字。 |
 
 无论怎么设置，主题都照常可用。
 
@@ -162,6 +175,10 @@ pi remove git:github.com/szxypi/pi-warm-ui
 ```
 
 如果 `theme` 设置的是本包的主题，卸载后 pi 会回退到 `system` 主题。到 `/settings` 里另选一个主题即可。
+
+## 致谢
+
+`warm-mahogany`、`warm-gruvbox`、`warm-sand` 三个主题和状态栏设计改编自 [oh-my-pi](https://github.com/can1357/oh-my-pi)（MIT）。见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。`scripts/import-omp-themes.mjs` 可以从 oh-my-pi 源码重新生成这三个主题。
 
 ## 许可证
 

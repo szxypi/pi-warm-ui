@@ -1,0 +1,34 @@
+{
+	"eyecare-warm": {
+		"bg": "#34302A",
+		"sep": "#5A554E",
+		"model": "#E2B86A",
+		"path": "#7FAEDC",
+		"gitClean": "#9DC47E",
+		"gitDirty": "#E2B86A",
+		"staged": "#9DC47E",
+		"dirty": "#E59A5C",
+		"untracked": "#7CC5BE",
+		"spend": "#7CC5BE",
+		"output": "#C89BD1",
+		"cost": "#EDC985",
+		"context": "#A39A8D",
+		"subagents": "#E2B86A"
+	},
+	"eyecare-warm-light": {
+		"bg": "#E8DFCF",
+		"sep": "#B3A895",
+		"model": "#93600F",
+		"path": "#2C6091",
+		"gitClean": "#4A7329",
+		"gitDirty": "#93600F",
+		"staged": "#4A7329",
+		"dirty": "#A8521A",
+		"untracked": "#28726B",
+		"spend": "#28726B",
+		"output": "#84498F",
+		"cost": "#7F6000",
+		"context": "#6B6257",
+		"subagents": "#93600F"
+	}
+}

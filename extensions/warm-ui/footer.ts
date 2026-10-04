@@ -1,9 +1,19 @@
+/**
+ * The status bar. "band" style (after oh-my-pi) draws two pills on the theme's status line background:
+ *
+ *    ~/projects/acme-api   feat/rate-limit +2 ~1 ?3         617k  720   0.010  ━━━━━━── 62% of 1M
+ *
+ * "plain" style draws the same segments as colored text. Colors come from the theme's status line
+ * palette (palette.ts). When the line is too narrow, the least important parts go first.
+ */
 import path from "node:path";
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { type Color, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Config } from "./config.ts";
-import { formatCwd, formatTokens, shortenPath, spread } from "./format.ts";
-import { type Icons, icons, withIcon } from "./icons.ts";
+import { formatCwd, formatTokens, shortenPath } from "./format.ts";
+import { type GitTracker, isDirty } from "./git.ts";
+import { icons, withIcon } from "./icons.ts";
+import { paletteFor } from "./palette.ts";
 
 const METER_CELLS = 10;
 
@@ -41,47 +51,29 @@ function sumUsage(ctx: ExtensionContext): Totals {
 	return t;
 }
 
-type Color = Parameters<Theme["fg"]>[0];
+type Token = Parameters<Theme["fg"]>[0];
 
 /** Usage level of the context window: green up to 50%, yellow up to 70%, orange up to 90%, then red. */
-function levelColor(pct: number): Color {
+function levelToken(pct: number): Token {
 	if (pct > 90) return "error";
 	if (pct > 70) return "warning";
 	if (pct > 50) return "syntaxNumber";
 	return "success";
 }
 
-/** Each meter cell keeps the color of its own zone, so a full meter reads as a gradient. */
-function meter(pct: number, theme: Theme): string {
-	const filled = pct <= 0 ? 0 : Math.min(METER_CELLS, Math.max(1, Math.round((pct / 100) * METER_CELLS)));
-	let out = "";
-	for (let i = 0; i < METER_CELLS; i++) {
-		out += i < filled ? theme.fg(levelColor(((i + 1) / METER_CELLS) * 100 - 1), "━") : theme.fg("borderMuted", "━");
-	}
-	return out;
-}
-
-/** Context usage: an icon, an optional meter and "12% of 200k". */
-function renderContext(theme: Theme, ctx: ExtensionContext, ic: Icons, withMeter: boolean, short: boolean): string | undefined {
-	const usage = ctx.getContextUsage();
-	const window = usage?.contextWindow ?? ctx.model?.contextWindow;
-	if (!window) return undefined;
-	const pct = usage?.percent ?? null;
-	const color: Color = pct === null ? "dim" : levelColor(pct);
-	const pctText = theme.fg(color, `${pct === null ? "?" : pct < 10 ? pct.toFixed(1) : Math.round(pct)}%`);
-	const label = short ? pctText : pctText + theme.fg("dim", ` of ${formatTokens(window)}`);
-	const icon = ic.context ? theme.fg(color === "dim" ? "muted" : color, ic.context) + " " : "";
-	if (!withMeter || pct === null) return icon + label;
-	return `${icon}${meter(pct, theme)} ${label}`;
+export interface FooterDeps {
+	config: Config;
+	git: GitTracker;
+	/** Number of subagent runs in progress. */
+	agents: () => number;
+	/** Called with the TUI's render request, so background updates can redraw the footer. */
+	onRender: (request: () => void) => void;
 }
 
 type FooterFactory = Parameters<ExtensionContext["ui"]["setFooter"]>[0];
 
-/**
- * One line: the working directory and git branch on the left, usage on the right.
- * Extension statuses go on a second line only when they exist.
- */
-export function createFooter(ctx: ExtensionContext, config: Config): FooterFactory {
+export function createFooter(ctx: ExtensionContext, deps: FooterDeps): FooterFactory {
+	const { config, git } = deps;
 	// The footer renders on every frame. Recount usage only when the entry count changes.
 	let cache: { count: number; totals: Totals } | undefined;
 	const totals = () => {
@@ -91,65 +83,123 @@ export function createFooter(ctx: ExtensionContext, config: Config): FooterFacto
 	};
 
 	return (tui, theme, footerData) => {
-		const unsub = footerData.onBranchChange(() => tui.requestRender());
+		deps.onRender(() => tui.requestRender());
+		const unsub = footerData.onBranchChange(() => {
+			git.refresh();
+			tui.requestRender();
+		});
 		return {
 			dispose: unsub,
 			invalidate() {},
 			render(fullWidth: number): string[] {
-				// One column of margin on each side aligns the footer with the transcript.
+				const ic = icons(config.icons);
+				const pal = paletteFor(theme);
+				const band = config.statusBar === "band" && pal.bg !== undefined;
+				const fg = (color: Color, text: string) => theme.style(text, { fg: color });
 				const margin = fullWidth > 40 ? 1 : 0;
 				const width = fullWidth - margin * 2;
-				const ic = icons(config.icons);
-				const sep = config.icons === "nerd" ? "  " : theme.fg("dim", " · ");
+
 				const t = totals();
 				const cwd = formatCwd(ctx.sessionManager.getCwd());
 				const branch = footerData.getGitBranch();
+				const status = branch ? git.status : undefined;
 				const name = ctx.sessionManager.getSessionName();
+				const agents = deps.agents();
+
+				const pill = (segments: string[]) => {
+					const parts = segments.filter(Boolean);
+					if (parts.length === 0) return "";
+					if (!band) return parts.join(config.icons === "nerd" ? "   " : theme.fg("dim", " · "));
+					const inner = ` ${parts.join(` ${fg(pal.sep, ic.sep)} `)} `;
+					const cap = (glyph: string) => (glyph ? theme.style(glyph, { fg: pal.bg! }) : "");
+					return cap(ic.capLeft) + theme.style(inner, { bg: pal.bg! }) + cap(ic.capRight);
+				};
+
+				const context = (withMeter: boolean, short: boolean) => {
+					const usage = ctx.getContextUsage();
+					const window = usage?.contextWindow ?? ctx.model?.contextWindow;
+					if (!window) return "";
+					const pct = usage?.percent ?? null;
+					const level: Token = pct === null ? "dim" : levelToken(pct);
+					const pctText = theme.fg(level, `${pct === null ? "?" : pct < 10 ? pct.toFixed(1) : Math.round(pct)}%`);
+					const label = short ? pctText : pctText + fg(pal.context, ` of ${formatTokens(window)}`);
+					const icon = ic.context ? `${theme.fg(level, ic.context)} ` : "";
+					if (!withMeter || pct === null) return icon + label;
+					// Each cell keeps the color of its own zone, so a full meter reads as a gradient.
+					const filled = pct <= 0 ? 0 : Math.min(METER_CELLS, Math.max(1, Math.round((pct / 100) * METER_CELLS)));
+					let meter = "";
+					for (let i = 0; i < METER_CELLS; i++) {
+						meter += i < filled ? theme.fg(levelToken(((i + 1) / METER_CELLS) * 100 - 1), "━") : fg(pal.sep, "━");
+					}
+					return `${icon}${meter} ${label}`;
+				};
 
 				// Parts to drop when the line is too narrow, least important first.
-				// The terminal title already shows the session name, so it goes early.
-				const show = { cache: true, name: true, tokens: true, meter: config.contextMeter, longContext: true, cost: true };
-				const drops: (keyof typeof show)[] = ["cache", "name", "tokens", "meter", "longContext", "cost"];
+				const show = { cache: true, name: true, gitDetail: true, tokens: true, meter: config.contextMeter, longContext: true, cost: true };
+				const drops: (keyof typeof show)[] = ["cache", "name", "gitDetail", "tokens", "meter", "longContext", "cost"];
 
+				const gitSegment = () => {
+					if (!branch) return "";
+					const color = isDirty(status) ? pal.gitDirty : pal.gitClean;
+					let text = fg(color, withIcon(ic.branch, branch, " "));
+					if (show.gitDetail && status) {
+						const marks: string[] = [];
+						if (status.ahead) marks.push(fg(pal.context, `${ic.ahead}${status.ahead}`));
+						if (status.behind) marks.push(fg(pal.context, `${ic.behind}${status.behind}`));
+						if (status.staged) marks.push(fg(pal.staged, `+${status.staged}`));
+						if (status.unstaged) marks.push(fg(pal.dirty, `~${status.unstaged}`));
+						if (status.untracked) marks.push(fg(pal.untracked, `?${status.untracked}`));
+						if (marks.length) text += ` ${marks.join(" ")}`;
+					}
+					return text;
+				};
+
+				const rightSegments = () => [
+					agents ? fg(pal.subagents, withIcon(ic.subagents, `${agents}`, " ")) : "",
+					show.name && name ? theme.fg("muted", withIcon(ic.session, name, " ")) : "",
+					show.tokens && (t.input || t.output)
+						? `${fg(pal.spend, withIcon(ic.up, formatTokens(t.input), ic.gap))} ${fg(pal.output, withIcon(ic.down, formatTokens(t.output), ic.gap))}`
+						: "",
+					show.cache && (t.cacheRead || t.cacheWrite) && t.hitRate !== undefined
+						? fg(pal.gitClean, withIcon(ic.cache, `${Math.round(t.hitRate)}%`, ic.gap))
+						: "",
+					show.cost && t.cost ? fg(pal.cost, withIcon(ic.cost, t.cost.toFixed(t.cost >= 1 ? 2 : 3), ic.gap)) : "",
+					context(show.meter, !show.longContext),
+				];
+
+				// The path takes what is left. Measure the rest with a placeholder of the shortest useful path.
+				const pathSegment = (p: string) => {
+					const cut = p.lastIndexOf(path.sep);
+					const icon = ic.dir ? `${fg(pal.path, ic.dir)} ` : "";
+					return icon + theme.fg("dim", p.slice(0, cut + 1)) + theme.bold(fg(pal.path, p.slice(cut + 1)));
+				};
+				const minPath = Math.min(visibleWidth(cwd), 16);
 				let right = "";
-				let suffix = "";
 				for (;;) {
-					const parts: string[] = [];
-					if (show.tokens && (t.input || t.output)) {
-						const up = withIcon(ic.up, formatTokens(t.input), ic.gap);
-						const down = withIcon(ic.down, formatTokens(t.output), ic.gap);
-						parts.push(theme.fg("syntaxType", `${up} ${down}`));
-					}
-					if (show.cache && (t.cacheRead || t.cacheWrite) && t.hitRate !== undefined) {
-						parts.push(theme.fg("success", withIcon(ic.cache, `${Math.round(t.hitRate)}%`, ic.gap)));
-					}
-					if (show.cost && t.cost) {
-						parts.push(theme.fg("syntaxNumber", withIcon(ic.cost, t.cost.toFixed(t.cost >= 1 ? 2 : 3), ic.gap)));
-					}
-					const context = renderContext(theme, ctx, ic, show.meter, !show.longContext);
-					if (context) parts.push(context);
-					right = parts.join(sep);
-					suffix = "";
-					if (branch) suffix += `  ${theme.fg("syntaxKeyword", withIcon(ic.branch, branch, " "))}`;
-					if (show.name && name) suffix += `  ${theme.fg("muted", withIcon(ic.session, name, " "))}`;
-					const leftMin = Math.min(visibleWidth(cwd), 16) + 2 + visibleWidth(suffix);
+					right = pill(rightSegments());
+					const leftMin = visibleWidth(pill([pathSegment("x".repeat(minPath)), gitSegment()]));
 					const next = drops.find((key) => show[key]);
-					if (visibleWidth(right) + 2 + leftMin <= width || next === undefined) break;
+					if (visibleWidth(right) + 1 + leftMin <= width || next === undefined) break;
 					show[next] = false;
 				}
+				// Shorten the path until both pills fit, or until it cannot get shorter.
+				const rw0 = visibleWidth(right);
+				let shown = cwd;
+				let left = pill([pathSegment(shown), gitSegment()]);
+				while (visibleWidth(left) + 1 + rw0 > width) {
+					const over = visibleWidth(left) + 1 + rw0 - width;
+					const next = shortenPath(cwd, Math.max(minPath, visibleWidth(shown) - over));
+					if (next === shown) break;
+					shown = next;
+					left = pill([pathSegment(shown), gitSegment()]);
+				}
 
-				// Left: the folder icon and current directory in blue, parent path in dim, then branch and session.
-				const dirIcon = ic.dir ? `${theme.fg("syntaxFunction", ic.dir)} ` : "";
-				const room = width - visibleWidth(right) - 2 - visibleWidth(suffix) - visibleWidth(dirIcon);
-				const shown = shortenPath(cwd, Math.max(room, 16));
-				const cut = shown.lastIndexOf(path.sep);
-				const left =
-					dirIcon +
-					theme.fg("dim", shown.slice(0, cut + 1)) +
-					theme.bold(theme.fg("syntaxFunction", shown.slice(cut + 1))) +
-					suffix;
+				const lw = visibleWidth(left);
+				const rw = visibleWidth(right);
+				const line =
+					lw + 1 + rw <= width ? left + " ".repeat(width - lw - rw) + right : truncateToWidth(left, width, "…");
 
-				const lines = [spread(left, right, width)];
+				const lines = [line];
 				const statuses = [...footerData.getExtensionStatuses().entries()]
 					.filter(([key]) => !config.hideStatuses.includes(key))
 					.sort(([a], [b]) => a.localeCompare(b))
@@ -157,7 +207,7 @@ export function createFooter(ctx: ExtensionContext, config: Config): FooterFacto
 					.filter(Boolean);
 				if (statuses.length) lines.push(truncateToWidth(statuses.join("   "), width, "…"));
 				const pad = " ".repeat(margin);
-				return lines.map((line) => pad + line);
+				return lines.map((l) => pad + l);
 			},
 		};
 	};

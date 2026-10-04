@@ -12,24 +12,39 @@ export interface Icons {
 	model: string;
 	thinking: string;
 	bash: string;
+	subagents: string;
+	ahead: string;
+	behind: string;
+	/** Separator between segments inside the band. */
+	sep: string;
+	/** Rounded ends of the band. Empty for square ends. */
+	capLeft: string;
+	capRight: string;
 	/** Space between an icon and its value. Plain symbols such as "$" and "↑" stick to the value. */
 	gap: string;
 }
 
 // Nerd Fonts v3 code points: fa-folder_open, oct-git_branch, fa-bookmark, md-arrow_up_bold, md-arrow_down_bold,
-// fa-database, fa-dollar, fa-microchip, md-robot, md-brain, fa-terminal.
+// fa-database, fa-dollar, fa-microchip, md-robot, md-brain, fa-terminal, fa-users,
+// powerline thin separator and rounded caps (E0B1, E0B6, E0B4).
 const NERD: Icons = {
-	dir: "",
-	branch: "",
-	session: "",
+	dir: "\uF07C",
+	branch: "\uF418",
+	session: "\uF02E",
 	up: "\u{F0737}",
 	down: "\u{F072E}",
-	cache: "",
-	cost: "",
-	context: "",
+	cache: "\uF1C0",
+	cost: "\uF155",
+	context: "\uF2DB",
 	model: "\u{F06A9}",
 	thinking: "\u{F09D1}",
-	bash: "",
+	bash: "\uF120",
+	subagents: "\uF0C0",
+	ahead: "▴",
+	behind: "▾",
+	sep: "\uE0B1",
+	capLeft: "\uE0B6",
+	capRight: "\uE0B4",
 	gap: " ",
 };
 
@@ -45,6 +60,12 @@ const UNICODE: Icons = {
 	model: "",
 	thinking: "",
 	bash: "",
+	subagents: "agents",
+	ahead: "▴",
+	behind: "▾",
+	sep: "│",
+	capLeft: "",
+	capRight: "",
 	gap: "",
 };
 

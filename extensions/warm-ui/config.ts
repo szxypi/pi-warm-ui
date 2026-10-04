@@ -15,6 +15,8 @@ export interface Config {
 	userMessages: boolean;
 	/** Status bar icons: "nerd" needs a Nerd Font, "unicode" uses plain symbols and labels, "none" uses labels only. */
 	icons: IconSet;
+	/** "band" draws the status bar on a colored band like oh-my-pi, "plain" draws colored text only. */
+	statusBar: "band" | "plain";
 }
 
 export type IconSet = "nerd" | "unicode" | "none";
@@ -28,6 +30,7 @@ const DEFAULTS: Config = {
 	tools: true,
 	userMessages: true,
 	icons: "unicode",
+	statusBar: "band",
 };
 
 export function loadConfig(): Config {
@@ -46,5 +49,6 @@ export function loadConfig(): Config {
 		tools: bool("tools"),
 		userMessages: bool("userMessages"),
 		icons: raw.icons === "nerd" || raw.icons === "unicode" || raw.icons === "none" ? raw.icons : DEFAULTS.icons,
+		statusBar: raw.statusBar === "band" || raw.statusBar === "plain" ? raw.statusBar : DEFAULTS.statusBar,
 	};
 }

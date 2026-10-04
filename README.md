@@ -1,6 +1,6 @@
 # pi-warm-ui
 
-Warm, low-glare themes and a calmer transcript for the [pi coding agent](https://github.com/earendil-works/pi): compact tool rows, readable subagent runs and a colorful one-line status bar.
+Warm, low-glare themes and a calmer transcript for the [pi coding agent](https://github.com/earendil-works/pi): five warm themes, compact tool rows, readable subagent runs and a status bar in the style of [oh-my-pi](https://github.com/can1357/oh-my-pi).
 
 [中文说明](README.zh-CN.md)
 
@@ -10,17 +10,26 @@ Warm, low-glare themes and a calmer transcript for the [pi coding agent](https:/
 
 ![Subagent runs](docs/screenshot-subagent.png)
 
+![All five themes](docs/themes.png)
+
 The screenshots use `"icons": "nerd"` and the JetBrainsMono Nerd Font.
 
 ## What you get
 
-**Two themes**
+**Five themes**
 
-- `eyecare-warm`: a dark theme on a warm brown background (`#262320`).
-- `eyecare-warm-light`: a light theme on a warm paper background (`#F5EFE4`).
-- Each theme has one accent color, amber. Headings, list bullets and the selected menu item use it.
-- Body text has a contrast ratio of at least 7.9:1 on every panel. Secondary text has at least 4.5:1.
-- The editor border shows the thinking level as a cool-to-warm ramp: off (gray), low (blue-gray), medium (teal), high (sage), xhigh (straw) and max (orange).
+| Theme | Look | Origin |
+|---|---|---|
+| `eyecare-warm` | dark, warm brown (`#262320`) | this package |
+| `eyecare-warm-light` | light, warm paper (`#F5EFE4`) | this package |
+| `warm-mahogany` | dark, deep mahogany (`#181210`) | oh-my-pi `mahogany` |
+| `warm-gruvbox` | dark, gruvbox (`#282828`) | oh-my-pi `dark-gruvbox` |
+| `warm-sand` | light, cream (`#FFFAF0`) | oh-my-pi `light-sand` |
+
+- oh-my-pi ships 100 themes. These three are the warm ones with the best contrast. They are renamed, and their colors are adjusted to this package's contrast standard.
+- The standard: body text at least 7:1, secondary text, code, diffs and tool output at least 4.5:1, status colors at least 3:1.
+- Each theme has a status bar palette (the colors of oh-my-pi's `statusLine*` tokens) and a matching terminal color scheme.
+- The editor border shows the thinking level as a ramp of the theme's thinking colors.
 
 **Tool rows**
 
@@ -52,20 +61,19 @@ For the `subagent` tool of [pi-code](https://www.npmjs.com/package/pi-code), and
 **Status bar**
 
 - The bottom border of the editor shows the model and the thinking level. In bash mode (`!` or `!!`), it shows `bash` or `bash · no context`. The top border keeps pi's own working status.
-- The footer is one line. Each segment has its own color:
+- The footer is one line in two parts, drawn as pills on the theme's status bar background (after oh-my-pi):
 
-  | Segment | Color |
-  |---|---|
-  | Directory (parent path dim, current folder bold) | blue |
-  | Git branch | purple |
-  | Session name | gray |
-  | Input and output tokens | cyan |
-  | Cache hit rate of the last request | green |
-  | Session cost | yellow |
-  | Context meter | green up to 50%, yellow up to 70%, orange up to 90%, then red |
+  ```
+   ~/projects/acme-api   feat/rate-limit +1 ~1 ?1        2  617k  720   0.010  ━━━━━━── 62% of 1M 
+  ```
 
-- With `"icons": "nerd"`, each segment also gets a Nerd Font icon.
-- When the terminal is narrow, the footer drops parts in this order: cache rate, session name, tokens, meter, long context text, cost.
+  - Left: the directory and the git branch. The branch turns from the clean color to the dirty color when files change. `+` counts staged files, `~` modified files, `?` untracked files, `▴`/`▾` commits ahead of and behind the upstream.
+  - Right: running subagents (only while they run), the session name, input and output tokens, the cache hit rate of the last request, the session cost and a context meter.
+  - The meter fills green up to 50%, yellow up to 70%, orange up to 90%, then red.
+- Each segment uses a color from the theme's status bar palette. A theme without a palette gets colors from its standard tokens.
+- Git status refreshes every 10 seconds, after each turn and after `bash`, `edit` and `write` calls. It uses `git status --no-optional-locks`, so it does not lock the index.
+- With `"icons": "nerd"`, segments get Nerd Font icons and the pills get rounded ends. `"statusBar": "plain"` draws the same segments without the background.
+- When the terminal is narrow, the footer drops parts in this order: cache rate, session name, git counts, tokens, meter, long context text, cost.
 - Extension statuses (for example goal or plan mode) go on a second line. This line shows only when a status exists.
 
 ## Install
@@ -78,10 +86,10 @@ Requires pi 1.0 or later. It was tested with pi 1.0.2.
    pi install git:github.com/szxypi/pi-warm-ui
    ```
 
-   To pin a version, add a tag: `git:github.com/szxypi/pi-warm-ui@v0.2.0`.
+   To pin a version, add a tag: `git:github.com/szxypi/pi-warm-ui@v0.3.0`.
 
 2. Start pi. The layout is active immediately.
-3. Open `/settings`, select **Theme**, then select `eyecare-warm` or `eyecare-warm-light`.
+3. Open `/settings`, select **Theme**, then select one of the five themes.
 4. If your terminal uses a [Nerd Font](https://www.nerdfonts.com/), create `~/.pi/agent/warm-ui.json` with `{ "icons": "nerd" }`, then run `/reload`.
 
 To follow the light or dark appearance of your terminal, set this in `~/.pi/agent/settings.json`:
@@ -102,16 +110,19 @@ pi does not paint the terminal background. The themes look best when the termina
 
 | File | Terminal |
 |---|---|
-| `terminal/windows-terminal.json` | Windows Terminal. Copy both objects into `"schemes"` in `settings.json`. |
-| `terminal/ghostty-eyecare-warm`, `terminal/ghostty-eyecare-warm-light` | Ghostty. Copy into `~/.config/ghostty/themes/`. |
-| `terminal/kitty-eyecare-warm.conf`, `terminal/kitty-eyecare-warm-light.conf` | kitty. Add `include <file>` to `kitty.conf`. |
+| `terminal/windows-terminal.json` | Windows Terminal. Copy the objects you want into `"schemes"` in `settings.json`. |
+| `terminal/ghostty-<theme>` | Ghostty. Copy into `~/.config/ghostty/themes/`. |
+| `terminal/kitty-<theme>.conf` | kitty. Add `include <file>` to `kitty.conf`. |
 
 For other terminals, use these core values:
 
-| Scheme | Background | Foreground | Cursor | Selection |
-|---|---|---|---|---|
-| EyeCare Warm | `#262320` | `#D3CBBF` | `#E2B86A` | `#4A443C` |
-| EyeCare Warm Light | `#F5EFE4` | `#3B352E` | `#93600F` | `#DCD0BC` |
+| Scheme | Background | Foreground |
+|---|---|---|
+| EyeCare Warm | `#262320` | `#D3CBBF` |
+| EyeCare Warm Light | `#F5EFE4` | `#3B352E` |
+| Warm Mahogany | `#181210` | `#ECE4D8` |
+| Warm Gruvbox | `#282828` | `#EBDBB2` |
+| Warm Sand | `#FFFAF0` | `#3E2723` |
 
 The 16 ANSI colors are in `terminal/windows-terminal.json`.
 
@@ -126,7 +137,8 @@ The extension reads `~/.pi/agent/warm-ui.json` when pi starts and on `/reload`. 
   "hideStatuses": ["pi-code-status"],
   "tools": true,
   "userMessages": true,
-  "icons": "unicode"
+  "icons": "unicode",
+  "statusBar": "band"
 }
 ```
 
@@ -138,6 +150,7 @@ The extension reads `~/.pi/agent/warm-ui.json` when pi starts and on `/reload`. 
 | `tools` | `false` keeps pi's own tool boxes, including subagent runs. |
 | `userMessages` | `false` removes the bar on user messages. |
 | `icons` | `"nerd"` uses Nerd Font icons. `"unicode"` uses plain symbols and short labels. `"none"` uses labels only. |
+| `statusBar` | `"band"` draws the footer on the theme's status bar background. `"plain"` draws colored text only. |
 
 The themes work with any of these settings.
 
@@ -162,6 +175,10 @@ pi remove git:github.com/szxypi/pi-warm-ui
 ```
 
 If your `theme` setting names one of these themes, pi falls back to its `system` theme after the removal. Select another theme in `/settings`.
+
+## Credits
+
+`warm-mahogany`, `warm-gruvbox` and `warm-sand`, and the status bar design, are adapted from [oh-my-pi](https://github.com/can1357/oh-my-pi) (MIT). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). `scripts/import-omp-themes.mjs` regenerates the three themes from an oh-my-pi checkout.
 
 ## License
 
