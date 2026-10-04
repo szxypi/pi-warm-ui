@@ -1,0 +1,46 @@
+{
+  "name": "pi-warm-ui",
+  "version": "0.1.0",
+  "description": "Warm, low-glare themes and a quiet one-line footer for the pi coding agent.",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-agent",
+    "pi-extension",
+    "pi-theme",
+    "theme",
+    "tui",
+    "footer"
+  ],
+  "license": "MIT",
+  "author": "szxypi",
+  "homepage": "https://github.com/szxypi/pi-warm-ui#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/szxypi/pi-warm-ui.git"
+  },
+  "bugs": {
+    "url": "https://github.com/szxypi/pi-warm-ui/issues"
+  },
+  "type": "module",
+  "files": [
+    "extensions",
+    "themes",
+    "terminal",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/warm-ui.ts"
+    ],
+    "themes": [
+      "./themes/*.json"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  }
+}
