@@ -7,7 +7,7 @@
  *   running subagents, usage and context usage. Colors come from the theme's status line palette.
  * - Tool rows: a status dot, a one-line summary and the output in a gutter. Subagent runs show
  *   one row per run with live progress.
- * - User messages: an accent bar on the left edge.
+ * - User messages: an accent bar on the left edge. Collapsed thinking blocks get an icon.
  *
  * Configuration: <agent dir>/warm-ui.json (see config.ts). "/warm-ui on|off" switches everything
  * until pi exits. Tool rows that are already drawn keep their style until /reload.
@@ -17,6 +17,7 @@ import { loadConfig } from "./config.ts";
 import { createEditor } from "./editor.ts";
 import { createFooter } from "./footer.ts";
 import { GitTracker } from "./git.ts";
+import { icons } from "./icons.ts";
 import { installUserMessageBar } from "./messages.ts";
 import { createToolResolver } from "./tools.ts";
 
@@ -36,6 +37,9 @@ export default function (pi: ExtensionAPI) {
 	const agents = () => [...running.values()].reduce((a, b) => a + b, 0);
 
 	const applyLayout = (ctx: ExtensionContext) => {
+		// pi shows this label in place of collapsed thinking blocks (hideThinkingBlock). undefined restores "Thinking...".
+		const thinkingIcon = icons(config.icons).hiddenThinking;
+		ctx.ui.setHiddenThinkingLabel(shared.enabled && thinkingIcon ? `${thinkingIcon} Thinking...` : undefined);
 		if (!shared.enabled || !config.enabled) {
 			git?.stop();
 			ctx.ui.setFooter(undefined);

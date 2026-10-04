@@ -57,6 +57,7 @@
 **用户消息**
 
 - 你的消息面板左侧加一条琥珀色竖条，滚动查找时更容易定位。
+- 隐藏思考内容时（`hideThinkingBlock`），`Thinking...` 行前加一个图标：`"icons": "nerd"` 时是大脑图标，`"unicode"` 时是 `✻`，`"none"` 时不加。
 
 **状态栏**
 
@@ -87,7 +88,7 @@
    pi install git:github.com/szxypi/pi-warm-ui
    ```
 
-   要固定版本，就在后面加 tag：`git:github.com/szxypi/pi-warm-ui@v0.4.0`。
+   要固定版本，就在后面加 tag：`git:github.com/szxypi/pi-warm-ui@v0.4.1`。
 
 2. 启动 pi。布局立即生效。
 3. 打开 `/settings`，选择 **Theme**，再从五个主题里选一个。

@@ -11,6 +11,8 @@ export interface Icons {
 	context: string;
 	model: string;
 	thinking: string;
+	/** Before pi's "Thinking..." label for collapsed thinking blocks. */
+	hiddenThinking: string;
 	bash: string;
 	subagents: string;
 	ahead: string;
@@ -38,6 +40,7 @@ const NERD: Icons = {
 	context: "\uF2DB",
 	model: "\u{F06A9}",
 	thinking: "\u{F09D1}",
+	hiddenThinking: "\u{F09D1}",
 	bash: "\uF120",
 	subagents: "\uF0C0",
 	ahead: "▴",
@@ -59,6 +62,7 @@ const UNICODE: Icons = {
 	context: "ctx",
 	model: "",
 	thinking: "",
+	hiddenThinking: "✻",
 	bash: "",
 	subagents: "agents",
 	ahead: "▴",
@@ -69,7 +73,7 @@ const UNICODE: Icons = {
 	gap: "",
 };
 
-const NONE: Icons = { ...UNICODE, branch: "", session: "·" };
+const NONE: Icons = { ...UNICODE, branch: "", session: "·", hiddenThinking: "" };
 
 export function icons(set: IconSet): Icons {
 	return set === "nerd" ? NERD : set === "none" ? NONE : UNICODE;

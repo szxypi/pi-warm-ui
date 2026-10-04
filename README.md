@@ -57,6 +57,7 @@ For the `subagent` tool of [pi-code](https://www.npmjs.com/package/pi-code), and
 **User messages**
 
 - Your messages get an amber bar on the left edge of their panel, so they are easy to find when you scroll.
+- When thinking blocks are hidden (`hideThinkingBlock`), the `Thinking...` line gets an icon: a brain with `"icons": "nerd"`, `✻` with `"unicode"`, none with `"none"`.
 
 **Status bar**
 
@@ -87,7 +88,7 @@ Requires pi 1.0 or later. It was tested with pi 1.0.2.
    pi install git:github.com/szxypi/pi-warm-ui
    ```
 
-   To pin a version, add a tag: `git:github.com/szxypi/pi-warm-ui@v0.4.0`.
+   To pin a version, add a tag: `git:github.com/szxypi/pi-warm-ui@v0.4.1`.
 
 2. Start pi. The layout is active immediately.
 3. Open `/settings`, select **Theme**, then select one of the five themes.
