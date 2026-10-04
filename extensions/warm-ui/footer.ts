@@ -6,16 +6,15 @@
  * "plain" style draws the same segments as colored text. Colors come from the theme's status line
  * palette (palette.ts). When the line is too narrow, the least important parts go first.
  */
+import os from "node:os";
 import path from "node:path";
 import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { type Color, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Config } from "./config.ts";
-import { formatCwd, formatTokens, shortenPath } from "./format.ts";
+import { formatTokens } from "./format.ts";
 import { type GitTracker, isDirty } from "./git.ts";
 import { icons, withIcon } from "./icons.ts";
 import { paletteFor } from "./palette.ts";
-
-const METER_CELLS = 10;
 
 interface Totals {
 	input: number;
@@ -52,6 +51,12 @@ function sumUsage(ctx: ExtensionContext): Totals {
 }
 
 type Token = Parameters<Theme["fg"]>[0];
+
+/** The project directory name, "~" for the home directory. */
+function projectName(cwd: string): string {
+	if (cwd === os.homedir()) return "~";
+	return path.basename(cwd) || cwd;
+}
 
 /** Usage level of the context window: green up to 50%, yellow up to 70%, orange up to 90%, then red. */
 function levelToken(pct: number): Token {
@@ -100,7 +105,7 @@ export function createFooter(ctx: ExtensionContext, deps: FooterDeps): FooterFac
 				const width = fullWidth - margin * 2;
 
 				const t = totals();
-				const cwd = formatCwd(ctx.sessionManager.getCwd());
+				const project = projectName(ctx.sessionManager.getCwd());
 				const branch = footerData.getGitBranch();
 				const status = branch ? git.status : undefined;
 				const name = ctx.sessionManager.getSessionName();
@@ -115,7 +120,7 @@ export function createFooter(ctx: ExtensionContext, deps: FooterDeps): FooterFac
 					return cap(ic.capLeft) + theme.style(inner, { bg: pal.bg! }) + cap(ic.capRight);
 				};
 
-				const context = (withMeter: boolean, short: boolean) => {
+				const context = (short: boolean) => {
 					const usage = ctx.getContextUsage();
 					const window = usage?.contextWindow ?? ctx.model?.contextWindow;
 					if (!window) return "";
@@ -123,20 +128,12 @@ export function createFooter(ctx: ExtensionContext, deps: FooterDeps): FooterFac
 					const level: Token = pct === null ? "dim" : levelToken(pct);
 					const pctText = theme.fg(level, `${pct === null ? "?" : pct < 10 ? pct.toFixed(1) : Math.round(pct)}%`);
 					const label = short ? pctText : pctText + fg(pal.context, ` of ${formatTokens(window)}`);
-					const icon = ic.context ? `${theme.fg(level, ic.context)} ` : "";
-					if (!withMeter || pct === null) return icon + label;
-					// Each cell keeps the color of its own zone, so a full meter reads as a gradient.
-					const filled = pct <= 0 ? 0 : Math.min(METER_CELLS, Math.max(1, Math.round((pct / 100) * METER_CELLS)));
-					let meter = "";
-					for (let i = 0; i < METER_CELLS; i++) {
-						meter += i < filled ? theme.fg(levelToken(((i + 1) / METER_CELLS) * 100 - 1), "━") : fg(pal.sep, "━");
-					}
-					return `${icon}${meter} ${label}`;
+					return (ic.context ? `${theme.fg(level, ic.context)} ` : "") + label;
 				};
 
 				// Parts to drop when the line is too narrow, least important first.
-				const show = { cache: true, name: true, gitDetail: true, tokens: true, meter: config.contextMeter, longContext: true, cost: true };
-				const drops: (keyof typeof show)[] = ["cache", "name", "gitDetail", "tokens", "meter", "longContext", "cost"];
+				const show = { cache: true, name: true, gitDetail: true, tokens: true, longContext: true, cost: true };
+				const drops: (keyof typeof show)[] = ["cache", "name", "gitDetail", "tokens", "longContext", "cost"];
 
 				const gitSegment = () => {
 					if (!branch) return "";
@@ -164,34 +161,18 @@ export function createFooter(ctx: ExtensionContext, deps: FooterDeps): FooterFac
 						? fg(pal.gitClean, withIcon(ic.cache, `${Math.round(t.hitRate)}%`, ic.gap))
 						: "",
 					show.cost && t.cost ? fg(pal.cost, withIcon(ic.cost, t.cost.toFixed(t.cost >= 1 ? 2 : 3), ic.gap)) : "",
-					context(show.meter, !show.longContext),
+					context(!show.longContext),
 				];
 
-				// The path takes what is left. Measure the rest with a placeholder of the shortest useful path.
-				const pathSegment = (p: string) => {
-					const cut = p.lastIndexOf(path.sep);
-					const icon = ic.dir ? `${fg(pal.path, ic.dir)} ` : "";
-					return icon + theme.fg("dim", p.slice(0, cut + 1)) + theme.bold(fg(pal.path, p.slice(cut + 1)));
-				};
-				const minPath = Math.min(visibleWidth(cwd), 16);
+				const dir = ic.dir ? `${fg(pal.path, ic.dir)} ` : "";
+				let left = "";
 				let right = "";
 				for (;;) {
+					left = pill([dir + theme.bold(fg(pal.path, project)), gitSegment()]);
 					right = pill(rightSegments());
-					const leftMin = visibleWidth(pill([pathSegment("x".repeat(minPath)), gitSegment()]));
 					const next = drops.find((key) => show[key]);
-					if (visibleWidth(right) + 1 + leftMin <= width || next === undefined) break;
+					if (visibleWidth(right) + 1 + visibleWidth(left) <= width || next === undefined) break;
 					show[next] = false;
-				}
-				// Shorten the path until both pills fit, or until it cannot get shorter.
-				const rw0 = visibleWidth(right);
-				let shown = cwd;
-				let left = pill([pathSegment(shown), gitSegment()]);
-				while (visibleWidth(left) + 1 + rw0 > width) {
-					const over = visibleWidth(left) + 1 + rw0 - width;
-					const next = shortenPath(cwd, Math.max(minPath, visibleWidth(shown) - over));
-					if (next === shown) break;
-					shown = next;
-					left = pill([pathSegment(shown), gitSegment()]);
 				}
 
 				const lw = visibleWidth(left);

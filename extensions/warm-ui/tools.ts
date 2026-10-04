@@ -1,8 +1,8 @@
 /**
- * Tool rows: a status dot, the tool name and a one-line summary, with the output in a gutter below.
+ * Tool rows: a status dot, the tool name and a one-line summary, with the output indented below.
  *
  *  ● bash  rg -n limit src                                  0.4s
- *  │ src/rate-limit.js:11:    return entry.count <= limit;
+ *    src/rate-limit.js:11:    return entry.count <= limit;
  *
  * The dot is dim while the arguments stream, accent while the tool runs, success when it is done
  * and error when it failed. Result bodies come from the tool's own renderer, so previews, diffs,
@@ -71,15 +71,13 @@ function track(st: RowState, ctx: RenderContext, status: Status): void {
 	st.wuTimer = timer;
 }
 
-/** Lines in a gutter: " │ line". */
+/** Body lines, indented to start under the tool name. */
 class Gutter implements Component {
 	body?: Component;
-	constructor(public theme: Theme) {}
 
 	render(width: number): string[] {
 		if (!this.body) return [];
-		const bar = this.theme.fg("borderMuted", "│");
-		return trimBlank(this.body.render(Math.max(1, width - 3))).map((line) => ` ${bar} ${line}`);
+		return trimBlank(this.body.render(Math.max(1, width - 3))).map((line) => `   ${line}`);
 	}
 
 	invalidate(): void {
@@ -94,11 +92,7 @@ class CallRow implements Component {
 	meta = "";
 	/** The tool's own call component. Without a label, its first line becomes the label. */
 	head?: Component;
-	readonly gutter: Gutter;
-
-	constructor(theme: Theme) {
-		this.gutter = new Gutter(theme);
-	}
+	readonly gutter = new Gutter();
 
 	render(width: number): string[] {
 		let label = this.label;
@@ -108,8 +102,7 @@ class CallRow implements Component {
 			if (label) extra = trimBlank(lines.slice(1));
 			else [label = "", ...extra] = lines;
 		}
-		const bar = this.gutter.theme.fg("borderMuted", "│");
-		return [spread(` ${this.dot} ${label}`, this.meta, width), ...extra.map((l) => ` ${bar} ${l}`), ...this.gutter.render(width)];
+		return [spread(` ${this.dot} ${label}`, this.meta, width), ...extra.map((l) => `   ${l}`), ...this.gutter.render(width)];
 	}
 
 	invalidate(): void {
@@ -178,8 +171,7 @@ function makeRenderCall(toolName: string, base: ToolRenderers | undefined): Rend
 		const status = statusOf(ctx);
 		track(st, ctx, status);
 
-		const row = ctx.lastComponent instanceof CallRow ? ctx.lastComponent : new CallRow(theme);
-		row.gutter.theme = theme;
+		const row = ctx.lastComponent instanceof CallRow ? ctx.lastComponent : new CallRow();
 		row.gutter.body = undefined;
 		row.head = undefined;
 		row.dot = dot(status, theme);
@@ -223,8 +215,7 @@ function makeRenderResult(toolName: string, base: ToolRenderers | undefined): Re
 			stopTimer(st);
 		}
 
-		const gutter = ctx.lastComponent instanceof Gutter ? ctx.lastComponent : new Gutter(theme);
-		gutter.theme = theme;
+		const gutter = ctx.lastComponent instanceof Gutter ? ctx.lastComponent : new Gutter();
 		if (toolName === "subagent" && isSubagentDetails(result.details)) {
 			gutter.body = renderSubagentBody(result.details, options, theme, ctx.cwd);
 		} else if (base?.renderResult) {

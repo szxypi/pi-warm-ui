@@ -34,15 +34,6 @@ export function displayPath(p: string, cwd: string): string {
 	return formatCwd(p);
 }
 
-/** Replace middle segments with "…" until the path fits in max columns. */
-export function shortenPath(p: string, max: number): string {
-	const segs = p.split(path.sep);
-	while (visibleWidth(segs.join(path.sep)) > max && segs.length > 3) {
-		segs.splice(1, segs[1] === "…" ? 2 : 1, "…");
-	}
-	return segs.join(path.sep);
-}
-
 /** Put left and right on one line. If they do not fit, truncate left first, then right. */
 export function spread(left: string, right: string, width: number): string {
 	if (!right) return truncateToWidth(left, width, "…");

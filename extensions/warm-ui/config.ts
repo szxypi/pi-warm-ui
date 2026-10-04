@@ -5,8 +5,6 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 export interface Config {
 	/** Footer and editor layout. */
 	enabled: boolean;
-	/** Context meter in the footer. */
-	contextMeter: boolean;
 	/** Status keys that the footer does not show. */
 	hideStatuses: string[];
 	/** Compact rows for tool calls, including subagent runs. */
@@ -17,6 +15,8 @@ export interface Config {
 	icons: IconSet;
 	/** "band" draws the status bar on a colored band like oh-my-pi, "plain" draws colored text only. */
 	statusBar: "band" | "plain";
+	/** Symbol before the first input line. "" turns it off. */
+	prompt: string;
 }
 
 export type IconSet = "nerd" | "unicode" | "none";
@@ -25,12 +25,12 @@ export type IconSet = "nerd" | "unicode" | "none";
 // It repeats the model and the context usage that the footer already shows.
 const DEFAULTS: Config = {
 	enabled: true,
-	contextMeter: true,
 	hideStatuses: ["pi-code-status"],
 	tools: true,
 	userMessages: true,
 	icons: "unicode",
 	statusBar: "band",
+	prompt: "❯",
 };
 
 export function loadConfig(): Config {
@@ -44,11 +44,11 @@ export function loadConfig(): Config {
 	const bool = (key: keyof Config) => (typeof raw[key] === "boolean" ? (raw[key] as boolean) : (DEFAULTS[key] as boolean));
 	return {
 		enabled: bool("enabled"),
-		contextMeter: bool("contextMeter"),
 		hideStatuses: Array.isArray(raw.hideStatuses) ? raw.hideStatuses.map(String) : DEFAULTS.hideStatuses,
 		tools: bool("tools"),
 		userMessages: bool("userMessages"),
 		icons: raw.icons === "nerd" || raw.icons === "unicode" || raw.icons === "none" ? raw.icons : DEFAULTS.icons,
 		statusBar: raw.statusBar === "band" || raw.statusBar === "plain" ? raw.statusBar : DEFAULTS.statusBar,
+		prompt: typeof raw.prompt === "string" ? raw.prompt.replace(/\s+/g, " ").trim() : DEFAULTS.prompt,
 	};
 }

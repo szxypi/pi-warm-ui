@@ -33,7 +33,7 @@ The screenshots use `"icons": "nerd"` and the JetBrainsMono Nerd Font.
 
 **Tool rows**
 
-- Each tool call is one header line: a status dot, the tool name and a one-line summary. The output sits in a gutter below.
+- Each tool call is one header line: a status dot, the tool name and a one-line summary. The output sits below it, indented to start under the tool name.
 
   ```
   ● edit  src/rate-limit.js                          +1 −1 · 0.2s
@@ -44,7 +44,7 @@ The screenshots use `"icons": "nerd"` and the JetBrainsMono Nerd Font.
 - The dot is dim while the arguments stream, amber while the tool runs, green when it is done and red when it fails.
 - The right side shows the duration of a live run, the diff stats of an edit, the line count of a read and the exit code of a failed command.
 - Shell commands lose a leading `cd <working directory> &&`. Paths inside the working directory are relative.
-- Result bodies come from each tool's own renderer, so previews, diffs, syntax highlighting and `ctrl+o` expansion keep working. Other tools (MCP, extensions) get the same header and gutter.
+- Result bodies come from each tool's own renderer, so previews, diffs, syntax highlighting and `ctrl+o` expansion keep working. Other tools (MCP, extensions) get the same header and indented output.
 
 **Subagent runs**
 
@@ -60,20 +60,21 @@ For the `subagent` tool of [pi-code](https://www.npmjs.com/package/pi-code), and
 
 **Status bar**
 
+- The editor shows a prompt symbol `❯` before the input. Wrapped lines and the autocomplete list are indented to match. In bash mode the symbol takes the bash color.
 - The bottom border of the editor shows the model and the thinking level. In bash mode (`!` or `!!`), it shows `bash` or `bash · no context`. The top border keeps pi's own working status.
 - The footer is one line in two parts, drawn as pills on the theme's status bar background (after oh-my-pi):
 
   ```
-   ~/projects/acme-api   feat/rate-limit +1 ~1 ?1        2  617k  720   0.010  ━━━━━━── 62% of 1M 
+   acme-api   feat/rate-limit +1 ~1 ?1                     2  617k  720   0.010   62% of 1M 
   ```
 
-  - Left: the directory and the git branch. The branch turns from the clean color to the dirty color when files change. `+` counts staged files, `~` modified files, `?` untracked files, `▴`/`▾` commits ahead of and behind the upstream.
-  - Right: running subagents (only while they run), the session name, input and output tokens, the cache hit rate of the last request, the session cost and a context meter.
-  - The meter fills green up to 50%, yellow up to 70%, orange up to 90%, then red.
+  - Left: the project directory name (not the full path) and the git branch. The branch turns from the clean color to the dirty color when files change. `+` counts staged files, `~` modified files, `?` untracked files, `▴`/`▾` commits ahead of and behind the upstream.
+  - Right: running subagents (only while they run), the session name, input and output tokens, the cache hit rate of the last request, the session cost and the context usage.
+  - The context percentage is green up to 50%, yellow up to 70%, orange up to 90%, then red.
 - Each segment uses a color from the theme's status bar palette. A theme without a palette gets colors from its standard tokens.
 - Git status refreshes every 10 seconds, after each turn and after `bash`, `edit` and `write` calls. It uses `git status --no-optional-locks`, so it does not lock the index.
 - With `"icons": "nerd"`, segments get Nerd Font icons and the pills get rounded ends. `"statusBar": "plain"` draws the same segments without the background.
-- When the terminal is narrow, the footer drops parts in this order: cache rate, session name, git counts, tokens, meter, long context text, cost.
+- When the terminal is narrow, the footer drops parts in this order: cache rate, session name, git counts, tokens, long context text, cost.
 - Extension statuses (for example goal or plan mode) go on a second line. This line shows only when a status exists.
 
 ## Install
@@ -86,7 +87,7 @@ Requires pi 1.0 or later. It was tested with pi 1.0.2.
    pi install git:github.com/szxypi/pi-warm-ui
    ```
 
-   To pin a version, add a tag: `git:github.com/szxypi/pi-warm-ui@v0.3.0`.
+   To pin a version, add a tag: `git:github.com/szxypi/pi-warm-ui@v0.4.0`.
 
 2. Start pi. The layout is active immediately.
 3. Open `/settings`, select **Theme**, then select one of the five themes.
@@ -133,22 +134,22 @@ The extension reads `~/.pi/agent/warm-ui.json` when pi starts and on `/reload`. 
 ```json
 {
   "enabled": true,
-  "contextMeter": true,
   "hideStatuses": ["pi-code-status"],
   "tools": true,
   "userMessages": true,
   "icons": "unicode",
-  "statusBar": "band"
+  "statusBar": "band",
+  "prompt": "❯"
 }
 ```
 
 | Key | Effect |
 |---|---|
 | `enabled` | `false` keeps pi's own footer and editor. |
-| `contextMeter` | `false` shows the context percentage without the meter. |
 | `hideStatuses` | Status keys that the footer does not show. |
 | `tools` | `false` keeps pi's own tool boxes, including subagent runs. |
 | `userMessages` | `false` removes the bar on user messages. |
+| `prompt` | The symbol before the input, for example `">"` or `"›"`. `""` removes it. |
 | `icons` | `"nerd"` uses Nerd Font icons. `"unicode"` uses plain symbols and short labels. `"none"` uses labels only. |
 | `statusBar` | `"band"` draws the footer on the theme's status bar background. `"plain"` draws colored text only. |
 

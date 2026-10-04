@@ -1,10 +1,10 @@
 /**
  * pi-warm-ui: a calm layout for the pi interactive mode.
  *
- * - Editor: the bottom border shows the model and the thinking level ("bash" in bash mode).
+ * - Editor: a prompt symbol before the input. The bottom border shows the model and the thinking level ("bash" in bash mode).
  *   The top border keeps pi's working status.
- * - Footer: a status bar on a colored band (after oh-my-pi) with the directory, git status,
- *   running subagents, usage and a context meter. Colors come from the theme's status line palette.
+ * - Footer: a status bar on a colored band (after oh-my-pi) with the project name, git status,
+ *   running subagents, usage and context usage. Colors come from the theme's status line palette.
  * - Tool rows: a status dot, a one-line summary and the output in a gutter. Subagent runs show
  *   one row per run with live progress.
  * - User messages: an accent bar on the left edge.
