@@ -1,7 +1,7 @@
 {
   "name": "pi-warm-ui",
-  "version": "0.1.0",
-  "description": "Warm, low-glare themes and a quiet one-line footer for the pi coding agent.",
+  "version": "0.2.0",
+  "description": "Warm, low-glare themes, compact tool and subagent rows, and a colorful one-line status bar for the pi coding agent.",
   "keywords": [
     "pi-package",
     "pi",
@@ -10,7 +10,9 @@
     "pi-theme",
     "theme",
     "tui",
-    "footer"
+    "footer",
+    "subagent",
+    "statusline"
   ],
   "license": "MIT",
   "author": "szxypi",
@@ -33,7 +35,7 @@
   ],
   "pi": {
     "extensions": [
-      "./extensions/warm-ui.ts"
+      "./extensions/warm-ui/index.ts"
     ],
     "themes": [
       "./themes/*.json"
