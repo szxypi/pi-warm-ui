@@ -62,6 +62,9 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_shutdown", () => {
 		git?.stop();
 		git = undefined;
+		// pi invalidates ctx right after this event. Renders and callbacks that run later must not read it.
+		theme = undefined;
+		requestRender = () => {};
 	});
 
 	// Refresh git status after anything that may touch files.

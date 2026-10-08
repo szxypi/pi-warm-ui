@@ -51,10 +51,20 @@ export class GitTracker {
 			this.again = true;
 			return;
 		}
+		// cwd() and exec() throw once the extension context is stale (after /reload or a session switch).
+		// A timer or a promise callback calls this, and a throw there would crash pi. Skip the round instead.
+		let run: ReturnType<ExtensionAPI["exec"]>;
+		try {
+			// --no-optional-locks keeps this read from competing with the agent's own git commands for index.lock.
+			run = this.pi.exec("git", ["--no-optional-locks", "status", "--porcelain=v1", "--branch"], {
+				cwd: this.cwd(),
+				timeout: 3000,
+			});
+		} catch {
+			return;
+		}
 		this.running = true;
-		// --no-optional-locks keeps this read from competing with the agent's own git commands for index.lock.
-		this.pi
-			.exec("git", ["--no-optional-locks", "status", "--porcelain=v1", "--branch"], { cwd: this.cwd(), timeout: 3000 })
+		run
 			.then((result) => {
 				const next = result.code === 0 ? parse(result.stdout) : undefined;
 				if (!same(next, this.status)) {

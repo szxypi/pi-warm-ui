@@ -6,6 +6,7 @@
  * pi has no renderer hook for user messages, so this wraps UserMessageComponent.render.
  * The wrapper is installed once per process. A reload replaces only the shared hooks below,
  * so the newest extension instance always decides whether the bar shows.
+ * A hook can throw while pi swaps the session. The wrapper then renders the message without the bar.
  */
 import { type Theme, UserMessageComponent } from "@earendil-works/pi-coding-agent";
 
@@ -33,8 +34,17 @@ export function installUserMessageBar(hooks: Hooks): void {
 	const patched: Patched = { hooks };
 	const original = proto.render as (this: unknown, width: number) => string[];
 	proto.render = function (this: unknown, width: number): string[] {
-		const theme = patched.hooks.theme();
-		if (!patched.hooks.enabled() || !theme || width < 10) return original.call(this, width);
+		if (!patched.hooks.enabled() || width < 10) return original.call(this, width);
+		// After a reload or a session switch, pi marks the old extension context stale. The old theme hook
+		// stays installed until the new instance replaces it, and a render can run in that gap.
+		// Reading a stale context throws. Draw the message without the bar instead of crashing pi.
+		let theme: Theme | undefined;
+		try {
+			theme = patched.hooks.theme();
+		} catch {
+			theme = undefined;
+		}
+		if (!theme) return original.call(this, width);
 		const bar = theme.style("▌", { fg: "accent", bg: "userMessageBg" });
 		return original.call(this, width - 1).map((line) => {
 			const marks = line.match(ZONE_MARKS)?.[0] ?? "";

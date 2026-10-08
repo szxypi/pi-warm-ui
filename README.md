@@ -88,7 +88,7 @@ Requires pi 1.0 or later. It was tested with pi 1.0.2.
    pi install git:github.com/szxypi/pi-warm-ui
    ```
 
-   To pin a version, add a tag: `git:github.com/szxypi/pi-warm-ui@v0.4.1`.
+   To pin a version, add a tag: `git:github.com/szxypi/pi-warm-ui@v0.4.2`.
 
 2. Start pi. The layout is active immediately.
 3. Open `/settings`, select **Theme**, then select one of the five themes.

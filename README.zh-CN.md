@@ -88,7 +88,7 @@
    pi install git:github.com/szxypi/pi-warm-ui
    ```
 
-   要固定版本，就在后面加 tag：`git:github.com/szxypi/pi-warm-ui@v0.4.1`。
+   要固定版本，就在后面加 tag：`git:github.com/szxypi/pi-warm-ui@v0.4.2`。
 
 2. 启动 pi。布局立即生效。
 3. 打开 `/settings`，选择 **Theme**，再从五个主题里选一个。

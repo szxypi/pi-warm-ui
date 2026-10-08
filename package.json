@@ -1,6 +1,6 @@
 {
   "name": "pi-warm-ui",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Five warm, low-glare themes, compact tool and subagent rows, and an oh-my-pi style status bar for the pi coding agent.",
   "keywords": [
     "pi-package",
