@@ -83,29 +83,24 @@ For the `subagent` tool of [pi-code](https://www.npmjs.com/package/pi-code), and
 
 **Agent panel**
 
-- A rounded box stays above the input, including before the first call and while idle. It keeps the latest request's tool calls across model turns; the next request starts a fresh list.
-- The frame uses seven rainbow colors. It flows while the agent is thinking, streaming text or running tools, then freezes when the run settles or is stopped. Idle ticks do not redraw the terminal. The agent panel, input borders and panel footer share the same left and right columns.
+- A persistent rainbow-framed roster sits above the input. Its first body row is always the current main model, for example `main  GPT 6.1 SOL · XHIGH`, including while idle. Model and thinking changes update it live.
+- Main and its directly delegated subagents start at the same left column. Only a subagent's own children are indented, with tree connectors.
 
   ```
-  ╭─────────────────────────────────────────────────────────────────── [-] ─╮
-  │ ● bash  rg -n limit src                                           3s      │
-  │ │ ✓ read  src/rate-limit.js                                       0.4s    │
-  │ ✗ edit  src/rate-limit.js  +1 −1                                  0.2s    │
-  ╰───────────────────────────────────────────────────────────────────────────╯
+  ╭────────────────────────────────────────────────────────────── [-] ─╮
+  │ ● main      GPT 6.1 SOL · XHIGH                                      │
+  │ ● scout     MINIMAX M3 · HIGH                                       │
+  │ ├─ ● coder  DEEPSEEK FLASH · MAX                                    │
+  │ └─ ✓ oracle GPT 6.1 SOL · XHIGH                                     │
+  │ ● reviewer  GLM 5.3 · MAX                                           │
+  ╰────────────────────────────────────────────────────────────────────╯
   ```
 
-- The top border only carries the fold marker on the right (plus the call count when collapsed). There is no duplicate main/model/thinking label; model details stay in the footer. A call that another tool made (`parentToolCallId`) is indented one level under `│`.
-- The status glyph is `●` while the call runs, `✓` when it succeeds, `✗` when it fails and `■` if it was interrupted. The tool name is cyan and bold, the summary comes from the same helper that the tool rows use, and the right side shows the elapsed time.
-- A `subagent` call shows the agent name and its task in place of the arguments, with the agent icon.
-- Click anywhere on the top border to fold or unfold. Folded, the border shows the call count next to `[+]`.
-
-  ```
-  ╭─────────────────────────────────────────────────── 󰚩 3  [+] ─╮
-  ```
-
-- The list stops at six rows. Running calls are kept first, and the last row reads `… +N more`.
-- A row gives up its summary first, then its time, then it cuts the tool name. Below 30 columns only the top border draws.
-- `/warm-ui agent-panel on|off` switches the panel for the session. `"agentPanel": false` turns it off in the config.
+- Ordinary tools such as bash/read/edit/codemode are not agents and stay in the transcript. Child rows use actual subagent result snapshots and native async run events/status files; an async launch receipt is not reported as completion.
+- Seven rainbow colors flow while main or a background child is running. The frame freezes when all have settled or stopped; idle ticks do not redraw. All input-dock frames share the same left/right columns.
+- The top-left border stays clear. Click the top border to fold/unfold; the right marker shows the total agent count when folded. Main is never dropped while expanded. The list keeps at most six body rows, retaining parents for nested rows and showing `… +N more` when needed.
+- Status marks: `●` running/idle (color differs), `◌` queued, `✓` completed, `✗` failed, `■` stopped. Models and thinking levels are uppercase; unreported child models show `…` rather than guessing the parent's model.
+- Below 30 columns only main remains in the body; very narrow widths or folding leave the top border. `/warm-ui agent-panel on|off` switches the panel for the session; `"agentPanel": false` disables it in the config.
 
 ## Install
 

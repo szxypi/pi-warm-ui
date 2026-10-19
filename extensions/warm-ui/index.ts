@@ -41,6 +41,8 @@ export default function (pi: ExtensionAPI) {
 	if (shared.statusBarOverride !== undefined) config.statusBar = shared.statusBarOverride;
 
 	let theme: (() => Theme) | undefined;
+	let live: ExtensionContext | undefined;
+	let unsubscribePanelEvents: (() => void)[] = [];
 	if (config.tools) pi.registerToolRenderer(createToolResolver(() => shared.enabled));
 	if (config.userMessages) installUserMessageBar({ enabled: () => shared.enabled, theme: () => theme?.() });
 
@@ -50,14 +52,21 @@ export default function (pi: ExtensionAPI) {
 	const running = new Map<string, number>();
 	const agents = () => [...running.values()].reduce((a, b) => a + b, 0);
 
-	// Keep the panel mounted while idle. A user request may contain many model turns: retain its tool
-	// rows until the next agent_start, and animate for the whole run rather than only during tools.
+	// The persistent roster always shows main. Only real subagent runs become child rows; ordinary
+	// tool calls stay in the transcript. Background children outlive settlement of the main request.
 	const panelStore = createAgentPanelStore();
 	let panelMounted = false;
 	let requestPanelRender = () => {};
 	// The factory gets the theme proxy from pi, so the panel follows a theme switch without a palette hook.
 	const panelFactory = createAgentPanel({
 		store: panelStore, config,
+		model: () => {
+			try {
+				const model = live?.model;
+				const effort = live?.thinkingLevel;
+				return { model: model?.name || model?.id, effort: model?.reasoning ? effort : undefined };
+			} catch { return {}; }
+		},
 		onRender: (request) => (requestPanelRender = request),
 	});
 	const syncPanel = (ctx: ExtensionContext) => {
@@ -95,10 +104,29 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_start", (_event, ctx) => {
 		if (ctx.mode !== "tui") return;
+		live = ctx;
 		theme = () => ctx.ui.theme;
 		running.clear();
 		panelStore.clear();
 		panelMounted = false;
+		for (const unsubscribe of unsubscribePanelEvents) unsubscribe();
+		const events: [string, (data: any, now: number) => void][] = [
+			["subagent:async-started", panelStore.asyncStarted],
+			["subagent:async-complete", panelStore.asyncComplete],
+			["subagent:foreground-complete", panelStore.foregroundComplete],
+			["subagent:child-status", panelStore.childStatus],
+		];
+		unsubscribePanelEvents = events.map(([name, update]) => pi.events.on(name, (data: any) => {
+			if (!live) return;
+			// pi-subagents shares an event bus with in-process children. Accept session-less child events
+			// only for a run already announced by this parent, never another session's unknown run.
+			try {
+				const sessionId = live.sessionManager.getSessionId();
+				if (data?.sessionId ? data.sessionId !== sessionId : !panelStore.knows(data?.runId ?? data?.id)) return;
+				update(data, Date.now());
+				requestPanelRender();
+			} catch { /* Late native event after session shutdown. */ }
+		}));
 		applyLayout(ctx);
 	});
 
@@ -106,6 +134,9 @@ export default function (pi: ExtensionAPI) {
 		git?.stop();
 		git = undefined;
 		// pi invalidates ctx right after this event. Renders and callbacks that run later must not read it.
+		live = undefined;
+		for (const unsubscribe of unsubscribePanelEvents) unsubscribe();
+		unsubscribePanelEvents = [];
 		theme = undefined;
 		requestRender = () => {};
 		requestPanelRender = () => {};
@@ -120,9 +151,9 @@ export default function (pi: ExtensionAPI) {
 	});
 	// agent_end can be followed by automatic continuation. Only the final settled boundary freezes
 	// the rainbow and stops any tool row that was interrupted before emitting its end event.
-	pi.on("agent_settled", (_event, ctx) => {
+	pi.on("agent_settled", (event, ctx) => {
 		if (ctx.mode !== "tui") return;
-		panelStore.settle(Date.now());
+		panelStore.settle(Date.now(), event.aborted);
 		requestPanelRender();
 	});
 	pi.on("turn_end", () => {
@@ -131,18 +162,24 @@ export default function (pi: ExtensionAPI) {
 	pi.on("tool_execution_end", (event, ctx) => {
 		if (["bash", "edit", "write", "powershell"].includes(event.toolName)) git?.refresh();
 		if (running.delete(event.toolCallId)) requestRender();
-		if (ctx.mode === "tui" && panelStore.calls.has(event.toolCallId)) {
-			panelStore.end(event, Date.now());
+		if (ctx.mode === "tui" && event.toolName === "subagent") {
+			panelStore.update(event.toolCallId, event.result, Date.now(), true, event.isError);
 			requestPanelRender();
 		}
 	});
+	pi.on("tool_execution_update", (event, ctx) => {
+		if (ctx.mode !== "tui" || event.toolName !== "subagent") return;
+		panelStore.update(event.toolCallId, event.partialResult, Date.now());
+		requestPanelRender();
+	});
+	pi.on("model_select", () => requestPanelRender());
+	pi.on("thinking_level_select", () => requestPanelRender());
 
 	// Count subagent runs: a parallel call runs one agent per task. Background runs return at once and are not counted.
 	pi.on("tool_execution_start", (event, ctx) => {
 		const args = event.args ?? {};
-		if (ctx.mode === "tui") {
-			// cwd is captured at start, so a render never reads the event's potentially stale context.
-			panelStore.start(event, ctx.sessionManager.getCwd(), Date.now());
+		if (ctx.mode === "tui" && event.toolName === "subagent") {
+			panelStore.start(event, Date.now());
 			syncPanel(ctx);
 		}
 		if (event.toolName !== "subagent" || args.status || args.cancel || args.background) return;

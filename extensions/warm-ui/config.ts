@@ -26,7 +26,7 @@ export interface Config {
 	prompt: string;
 	/** "model · level" label on the editor bottom border. false keeps a plain border. */
 	modelLabel: boolean;
-	/** Persistent rainbow-framed panel above the input, listing the latest agent run's tool calls. */
+	/** Persistent rainbow-framed roster above the input, showing main and real child agents. */
 	agentPanel: boolean;
 }
 
