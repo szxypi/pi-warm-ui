@@ -26,6 +26,8 @@ export interface Config {
 	prompt: string;
 	/** "model · level" label on the editor bottom border. false keeps a plain border. */
 	modelLabel: boolean;
+	/** The agent panel above the input, listing the tool calls of the current turn. */
+	agentPanel: boolean;
 }
 
 export type IconSet = "nerd" | "unicode" | "none";
@@ -41,6 +43,7 @@ const DEFAULTS: Config = {
 	statusBar: "band",
 	prompt: "❯",
 	modelLabel: true,
+	agentPanel: true,
 };
 
 export function loadConfig(): Config {
@@ -68,5 +71,6 @@ export function loadConfig(): Config {
 				: DEFAULTS.statusBar,
 		prompt: typeof raw.prompt === "string" ? raw.prompt.replace(/\s+/g, " ").trim() : DEFAULTS.prompt,
 		modelLabel: bool("modelLabel"),
+		agentPanel: bool("agentPanel"),
 	};
 }

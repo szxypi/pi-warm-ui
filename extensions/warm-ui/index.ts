@@ -14,6 +14,7 @@
  * Tool rows that are already drawn keep their style until /reload.
  */
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
+import { createAgentPanel, createAgentPanelStore } from "./agent-panel.ts";
 import { loadConfig } from "./config.ts";
 import { createEditor } from "./editor.ts";
 import { createFooter } from "./footer.ts";
@@ -24,6 +25,9 @@ import { createToolResolver } from "./tools.ts";
 
 const STYLES = ["band", "plain", "bar", "rail", "panel"] as const;
 type StatusBarStyle = typeof STYLES[number];
+
+/** The widget key. Setting it to undefined removes the panel. */
+const AGENT_PANEL_KEY = "warm-panel";
 
 export default function (pi: ExtensionAPI) {
 	// Shared state outlives /reload. Initialised once per pi process.
@@ -37,6 +41,9 @@ export default function (pi: ExtensionAPI) {
 	if (shared.statusBarOverride !== undefined) config.statusBar = shared.statusBarOverride;
 
 	let theme: (() => Theme) | undefined;
+	// The live extension context. pi marks it stale after /reload and a session switch, so reads are
+	// guarded: session_start replaces it and session_shutdown clears it.
+	let live: ExtensionContext | undefined;
 
 	if (config.tools) pi.registerToolRenderer(createToolResolver(() => shared.enabled));
 	if (config.userMessages) installUserMessageBar({ enabled: () => shared.enabled, theme: () => theme?.() });
@@ -47,6 +54,31 @@ export default function (pi: ExtensionAPI) {
 	const running = new Map<string, number>();
 	const agents = () => [...running.values()].reduce((a, b) => a + b, 0);
 
+	// The agent panel: the tool calls of the current turn, above the input. The store holds the rows so
+	// the widget component stays stateless; the panel shows from the first call until the turn ends.
+	const panelStore = createAgentPanelStore();
+	/** Current model and thinking level, read live so /model and shift+tab show on the next frame. */
+	const readModel = (): { model: string; effort: string | undefined } => {
+		try {
+			const model = live?.model;
+			const id = model?.id ?? model?.name ?? "";
+			const level = live?.thinkingLevel;
+			return { model: id, effort: model?.reasoning && level && level !== "off" ? level : undefined };
+		} catch {
+			return { model: "", effort: undefined };
+		}
+	};
+	// The factory gets the theme proxy from pi, so the panel follows a theme switch without a palette hook.
+	const panelFactory = createAgentPanel({ store: panelStore, config, model: readModel });
+	const syncPanel = (ctx: ExtensionContext) => {
+		if (!shared.enabled || !config.enabled || !config.agentPanel) {
+			ctx.ui.setWidget(AGENT_PANEL_KEY, undefined);
+			return;
+		}
+		// The store keeps the rows; the widget only draws them. Re-setting replaces the old component.
+		ctx.ui.setWidget(AGENT_PANEL_KEY, panelFactory, { placement: "aboveEditor" });
+	};
+
 	const applyLayout = (ctx: ExtensionContext) => {
 		// pi shows this label in place of collapsed thinking blocks (hideThinkingBlock). undefined restores "Thinking...".
 		const thinkingIcon = icons(config.icons).hiddenThinking;
@@ -55,6 +87,7 @@ export default function (pi: ExtensionAPI) {
 			git?.stop();
 			ctx.ui.setFooter(undefined);
 			ctx.ui.setEditorComponent(undefined);
+			ctx.ui.setWidget(AGENT_PANEL_KEY, undefined);
 			return;
 		}
 		git ??= new GitTracker(pi, () => ctx.sessionManager.getCwd(), () => requestRender());
@@ -65,8 +98,10 @@ export default function (pi: ExtensionAPI) {
 
 	pi.on("session_start", (_event, ctx) => {
 		if (ctx.mode !== "tui") return;
+		live = ctx;
 		theme = () => ctx.ui.theme;
 		running.clear();
+		panelStore.clear();
 		applyLayout(ctx);
 	});
 
@@ -74,20 +109,36 @@ export default function (pi: ExtensionAPI) {
 		git?.stop();
 		git = undefined;
 		// pi invalidates ctx right after this event. Renders and callbacks that run later must not read it.
+		live = undefined;
 		theme = undefined;
 		requestRender = () => {};
+		panelStore.clear();
 	});
 
-	// Refresh git status after anything that may touch files.
-	pi.on("turn_end", () => git?.refresh());
-	pi.on("tool_execution_end", (event) => {
+	// Refresh git status after anything that may touch files. The agent panel keeps its rows until the
+	// turn ends, then the next turn starts with an empty panel.
+	pi.on("turn_end", (_event, ctx) => {
+		git?.refresh();
+		panelStore.clear();
+		ctx.ui.setWidget(AGENT_PANEL_KEY, undefined);
+	});
+	pi.on("tool_execution_end", (event, ctx) => {
 		if (["bash", "edit", "write", "powershell"].includes(event.toolName)) git?.refresh();
 		if (running.delete(event.toolCallId)) requestRender();
+		if (config.agentPanel && panelStore.calls.has(event.toolCallId)) {
+			panelStore.end(event, Date.now());
+			ctx.ui.setWidget(AGENT_PANEL_KEY, panelFactory, { placement: "aboveEditor" });
+		}
 	});
 
 	// Count subagent runs: a parallel call runs one agent per task. Background runs return at once and are not counted.
-	pi.on("tool_execution_start", (event) => {
+	pi.on("tool_execution_start", (event, ctx) => {
 		const args = event.args ?? {};
+		if (config.agentPanel && shared.enabled && config.enabled) {
+			// The panel opens on the first call of the turn. cwd is read here, so a render never reads ctx.
+			panelStore.start(event, ctx.sessionManager.getCwd(), Date.now());
+			syncPanel(ctx);
+		}
 		if (event.toolName !== "subagent" || args.status || args.cancel || args.background) return;
 		running.set(event.toolCallId, Array.isArray(args.tasks) && args.tasks.length > 0 ? args.tasks.length : 1);
 		requestRender();
@@ -119,9 +170,28 @@ export default function (pi: ExtensionAPI) {
 				return;
 			}
 
+			// /warm-ui agent-panel [on|off]
+			if (arg === "agent-panel" || arg.startsWith("agent-panel ")) {
+				const name = arg.slice("agent-panel".length).trim();
+				if (!name) {
+					ctx.ui.notify(`agent panel: ${config.agentPanel ? "on" : "off"}. Usage: /warm-ui agent-panel on|off`, "info");
+					return;
+				}
+				if (name !== "on" && name !== "off") {
+					ctx.ui.notify(`Unknown value "${name}". Usage: /warm-ui agent-panel on|off`, "error");
+					return;
+				}
+				config.agentPanel = name === "on";
+				// Off removes the panel at once. On re-mounts it, so the next call of this turn shows again.
+				if (config.agentPanel && panelStore.size() > 0) syncPanel(ctx);
+				else ctx.ui.setWidget(AGENT_PANEL_KEY, undefined);
+				ctx.ui.notify(`Agent panel ${name} for this session.`, "info");
+				return;
+			}
+
 			if (arg !== "on" && arg !== "off") {
 				ctx.ui.notify(
-					`warm-ui is ${shared.enabled ? "on" : "off"}. Usage: /warm-ui on|off|style [${STYLES.join("|")}]`,
+					`warm-ui is ${shared.enabled ? "on" : "off"}. Usage: /warm-ui on|off|style [${STYLES.join("|")}]|agent-panel [on|off]`,
 					"info",
 				);
 				return;

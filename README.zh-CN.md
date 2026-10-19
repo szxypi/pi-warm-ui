@@ -80,6 +80,31 @@
 - 终端太窄时，footer 按以下顺序隐藏内容：缓存命中率、会话名、git 计数、token、上下文总量、费用。
 - 扩展状态（例如 goal、plan mode）显示在第二行。没有状态时不显示这一行。
 
+**代理面板**
+
+- 输入框上方有一个圆角框，列出本轮的工具调用。第一次调用时出现，本轮结束时消失。
+
+  ```
+  ╭─ ● main  glm-5.3 · max ───────────────────────────────────────────── [- ]─╮
+  │ ● bash  rg -n limit src                                           3s      │
+  │ │ ✓ read  src/rate-limit.js                                       0.4s    │
+  │ ✗ edit  src/rate-limit.js  +1 −1                                  0.2s    │
+  ╰───────────────────────────────────────────────────────────────────────────╯
+  ```
+
+- 上边框显示 `● main`、模型名和思考等级，以及折叠标记。其他工具发起的调用（`parentToolCallId`）在 `│` 下缩进一级。
+- 状态符号：运行中是 `●`，成功是 `✓`，失败是 `✗`。工具名青色加粗，参数摘要复用工具行的同一个函数，右侧显示已用时长。
+- `subagent` 调用改为显示代理名和它的任务，前面带代理图标。
+- 点击上边框任意位置即可折叠或展开。折叠后上边框在 `[+]` 旁显示调用数。
+
+  ```
+  ╭─ ● main  glm-5.3 · max ───────────────────────────── 󰚩 3  [+] ─╮
+  ```
+
+- 列表最多 6 行。优先保留运行中的调用，最后一行显示 `… +N more`。
+- 一行放不下时，先丢参数摘要，再丢时长，最后截断工具名。低于 30 列时只画上边框。
+- `/warm-ui agent-panel on|off` 在本次会话里开关面板。配置里设 `"agentPanel": false` 可关掉。
+
 ## 安装
 
 需要 pi 1.0 或更高版本。已在 pi 1.0.2 上测试。
@@ -90,7 +115,7 @@
    pi install git:github.com/szxypi/pi-warm-ui
    ```
 
-   要固定版本，就在后面加 tag：`git:github.com/szxypi/pi-warm-ui@v0.5.0`。
+   要固定版本，就在后面加 tag：`git:github.com/szxypi/pi-warm-ui@v0.6.0`。
 
 2. 启动 pi。布局立即生效。
 3. 打开 `/settings`，选择 **Theme**，再从五个主题里选一个。
@@ -143,7 +168,8 @@ pi 启动时和运行 `/reload` 时，扩展读取 `~/.pi/agent/warm-ui.json`。
   "icons": "unicode",
   "statusBar": "band",
   "prompt": "❯",
-  "modelLabel": true
+  "modelLabel": true,
+  "agentPanel": true
 }
 ```
 
@@ -155,6 +181,7 @@ pi 启动时和运行 `/reload` 时，扩展读取 `~/.pi/agent/warm-ui.json`。
 | `userMessages` | 设为 `false` 时去掉用户消息的竖条。 |
 | `prompt` | 输入内容前的提示符，例如 `">"` 或 `"›"`。设为 `""` 时不显示。 |
 | `modelLabel` | 设为 `false` 时去掉输入框下边框的模型名与思考等级。`bash` 标签保留。 |
+| `agentPanel` | `true` 时在输入框上方画代理面板。设为 `false` 关掉。 |
 | `icons` | `"nerd"` 使用 Nerd Font 图标。`"unicode"` 使用普通符号和短标签。`"none"` 只用标签。 |
 | `statusBar` | `"band"` 在主题的状态栏底色上画 footer。`"plain"` 只显示彩色文字。`"bar"` 画一行全宽实底。`"rail"` 不画底色，左右两组之间用暗色横线连接。`"panel"` 画一个占满宽度的三行方框，开头是模型名与思考等级，边框取上下文水位色。 |
 
