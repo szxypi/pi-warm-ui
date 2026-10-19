@@ -15,6 +15,9 @@ type EditorFactory = Parameters<ExtensionContext["ui"]["setEditorComponent"]>[0]
  *   ───────────────────── 󰚩 glm-5.3 · 󰧑 high ───
  *
  * The top border keeps pi's working status (embedWorkingStatus).
+ *
+ * "modelLabel": false drops the model part and keeps a plain bottom border.
+ * While the input is a shell command, the bash label stays.
  */
 export function createEditor(pi: ExtensionAPI, ctx: ExtensionContext, config: Config): EditorFactory {
 	const ic = icons(config.icons);
@@ -76,6 +79,8 @@ export function createEditor(pi: ExtensionAPI, ctx: ExtensionContext, config: Co
 			if (linesBelow > 0 || !model) return super.renderBottomBorder(width, linesBelow);
 			const theme = ctx.ui.theme;
 			const input = this.getText().trimStart();
+			// The bash label shows the input mode, not the model. "modelLabel": false keeps it.
+			if (!config.modelLabel && !input.startsWith("!")) return super.renderBottomBorder(width, linesBelow);
 			let label: string;
 			if (input.startsWith("!")) {
 				// pi colors the border with bashMode while the input is a shell command.

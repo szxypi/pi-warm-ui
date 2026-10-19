@@ -142,7 +142,8 @@ The extension reads `~/.pi/agent/warm-ui.json` when pi starts and on `/reload`. 
   "userMessages": true,
   "icons": "unicode",
   "statusBar": "band",
-  "prompt": "❯"
+  "prompt": "❯",
+  "modelLabel": true
 }
 ```
 
@@ -153,6 +154,7 @@ The extension reads `~/.pi/agent/warm-ui.json` when pi starts and on `/reload`. 
 | `tools` | `false` keeps pi's own tool boxes, including subagent runs. |
 | `userMessages` | `false` removes the bar on user messages. |
 | `prompt` | The symbol before the input, for example `">"` or `"›"`. `""` removes it. |
+| `modelLabel` | `false` removes the model and thinking level label from the editor bottom border. The `bash` label stays. |
 | `icons` | `"nerd"` uses Nerd Font icons. `"unicode"` uses plain symbols and short labels. `"none"` uses labels only. |
 | `statusBar` | `"band"` draws the footer on the theme's status bar background. `"plain"` draws colored text only. `"bar"` draws one full-width solid row. `"rail"` joins the two groups with a dim rule and no background. `"panel"` draws a three-row box that fills the width, starting with the model and the thinking level, with the border in the context level color. |
 

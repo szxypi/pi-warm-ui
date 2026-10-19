@@ -142,7 +142,8 @@ pi 启动时和运行 `/reload` 时，扩展读取 `~/.pi/agent/warm-ui.json`。
   "userMessages": true,
   "icons": "unicode",
   "statusBar": "band",
-  "prompt": "❯"
+  "prompt": "❯",
+  "modelLabel": true
 }
 ```
 
@@ -153,6 +154,7 @@ pi 启动时和运行 `/reload` 时，扩展读取 `~/.pi/agent/warm-ui.json`。
 | `tools` | 设为 `false` 时保留 pi 自带的工具框，包括子代理运行。 |
 | `userMessages` | 设为 `false` 时去掉用户消息的竖条。 |
 | `prompt` | 输入内容前的提示符，例如 `">"` 或 `"›"`。设为 `""` 时不显示。 |
+| `modelLabel` | 设为 `false` 时去掉输入框下边框的模型名与思考等级。`bash` 标签保留。 |
 | `icons` | `"nerd"` 使用 Nerd Font 图标。`"unicode"` 使用普通符号和短标签。`"none"` 只用标签。 |
 | `statusBar` | `"band"` 在主题的状态栏底色上画 footer。`"plain"` 只显示彩色文字。`"bar"` 画一行全宽实底。`"rail"` 不画底色，左右两组之间用暗色横线连接。`"panel"` 画一个占满宽度的三行方框，开头是模型名与思考等级，边框取上下文水位色。 |
 

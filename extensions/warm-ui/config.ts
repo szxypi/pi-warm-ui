@@ -24,6 +24,8 @@ export interface Config {
 	statusBar: "band" | "plain" | "bar" | "rail" | "panel";
 	/** Symbol before the first input line. "" turns it off. */
 	prompt: string;
+	/** "model · level" label on the editor bottom border. false keeps a plain border. */
+	modelLabel: boolean;
 }
 
 export type IconSet = "nerd" | "unicode" | "none";
@@ -38,6 +40,7 @@ const DEFAULTS: Config = {
 	icons: "unicode",
 	statusBar: "band",
 	prompt: "❯",
+	modelLabel: true,
 };
 
 export function loadConfig(): Config {
@@ -64,5 +67,6 @@ export function loadConfig(): Config {
 				? raw.statusBar
 				: DEFAULTS.statusBar,
 		prompt: typeof raw.prompt === "string" ? raw.prompt.replace(/\s+/g, " ").trim() : DEFAULTS.prompt,
+		modelLabel: bool("modelLabel"),
 	};
 }
