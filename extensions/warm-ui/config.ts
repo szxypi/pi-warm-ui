@@ -13,8 +13,15 @@ export interface Config {
 	userMessages: boolean;
 	/** Status bar icons: "nerd" needs a Nerd Font, "unicode" uses plain symbols and labels, "none" uses labels only. */
 	icons: IconSet;
-	/** "band" draws the status bar on a colored band like oh-my-pi, "plain" draws colored text only. */
-	statusBar: "band" | "plain";
+	/**
+	 * Status bar style.
+	 * - "band"  colored capsule bands (default, like oh-my-pi)
+	 * - "plain" colored text only, no background
+	 * - "bar"   full-width solid background row, no caps
+	 * - "rail"  no background; left and right groups connected by a dim rule
+	 * - "panel" three-row rounded box that fills the width; the border follows the context level
+	 */
+	statusBar: "band" | "plain" | "bar" | "rail" | "panel";
 	/** Symbol before the first input line. "" turns it off. */
 	prompt: string;
 }
@@ -48,7 +55,14 @@ export function loadConfig(): Config {
 		tools: bool("tools"),
 		userMessages: bool("userMessages"),
 		icons: raw.icons === "nerd" || raw.icons === "unicode" || raw.icons === "none" ? raw.icons : DEFAULTS.icons,
-		statusBar: raw.statusBar === "band" || raw.statusBar === "plain" ? raw.statusBar : DEFAULTS.statusBar,
+		statusBar:
+			raw.statusBar === "band" ||
+			raw.statusBar === "plain" ||
+			raw.statusBar === "bar" ||
+			raw.statusBar === "rail" ||
+			raw.statusBar === "panel"
+				? raw.statusBar
+				: DEFAULTS.statusBar,
 		prompt: typeof raw.prompt === "string" ? raw.prompt.replace(/\s+/g, " ").trim() : DEFAULTS.prompt,
 	};
 }

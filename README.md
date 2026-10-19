@@ -75,6 +75,8 @@ For the `subagent` tool of [pi-code](https://www.npmjs.com/package/pi-code), and
 - Each segment uses a color from the theme's status bar palette. A theme without a palette gets colors from its standard tokens.
 - Git status refreshes every 10 seconds, after each turn and after `bash`, `edit` and `write` calls. It uses `git status --no-optional-locks`, so it does not lock the index.
 - With `"icons": "nerd"`, segments get Nerd Font icons and the pills get rounded ends. `"statusBar": "plain"` draws the same segments without the background.
+- `"statusBar": "bar"` draws a single full-width row on a solid background, without caps. `"statusBar": "rail"` draws no background; a dim rule joins the left and right groups. Both fall back to plain text when the terminal is too narrow.
+- `"statusBar": "panel"` draws a three-row box that fills the width. The top border starts with the model and the thinking level, then the directory, the git counts and the session name. The middle row holds an `ctx` bar, the token counts, the cache rate and the cost. The bottom border shows the running subagents. The border uses the context level color. Narrow terminals drop the session name, the git counts, the branch, the directory and the model name in that order. Below 24 columns the panel becomes plain text.
 - When the terminal is narrow, the footer drops parts in this order: cache rate, session name, git counts, tokens, long context text, cost.
 - Extension statuses (for example goal or plan mode) go on a second line. This line shows only when a status exists.
 
@@ -88,7 +90,7 @@ Requires pi 1.0 or later. It was tested with pi 1.0.2.
    pi install git:github.com/szxypi/pi-warm-ui
    ```
 
-   To pin a version, add a tag: `git:github.com/szxypi/pi-warm-ui@v0.4.2`.
+   To pin a version, add a tag: `git:github.com/szxypi/pi-warm-ui@v0.5.0`.
 
 2. Start pi. The layout is active immediately.
 3. Open `/settings`, select **Theme**, then select one of the five themes.
@@ -152,7 +154,7 @@ The extension reads `~/.pi/agent/warm-ui.json` when pi starts and on `/reload`. 
 | `userMessages` | `false` removes the bar on user messages. |
 | `prompt` | The symbol before the input, for example `">"` or `"›"`. `""` removes it. |
 | `icons` | `"nerd"` uses Nerd Font icons. `"unicode"` uses plain symbols and short labels. `"none"` uses labels only. |
-| `statusBar` | `"band"` draws the footer on the theme's status bar background. `"plain"` draws colored text only. |
+| `statusBar` | `"band"` draws the footer on the theme's status bar background. `"plain"` draws colored text only. `"bar"` draws one full-width solid row. `"rail"` joins the two groups with a dim rule and no background. `"panel"` draws a three-row box that fills the width, starting with the model and the thinking level, with the border in the context level color. |
 
 The themes work with any of these settings.
 
@@ -166,6 +168,7 @@ If you set `PI_CODING_AGENT_DIR`, the extension reads `warm-ui.json` from that d
 |---|---|
 | `/warm-ui off` | Restore pi's own footer, editor, tool rows and user messages until pi exits. |
 | `/warm-ui on` | Turn the layout on again. |
+| `/warm-ui style <name>` | Switch the status bar style for this session: `band`, `plain`, `bar`, `rail` or `panel`. Run `/warm-ui style` alone to show the current style and the options. |
 | `/warm-ui` | Show the current state. |
 
 Tool rows that are already on screen keep their style. Run `/reload` to redraw them.

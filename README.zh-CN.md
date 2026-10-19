@@ -75,6 +75,8 @@
 - 每段颜色取自主题的状态栏配色。没有配色的主题从它的标准颜色推导。
 - git 状态每 10 秒刷新一次，每轮对话结束后和每次 `bash`、`edit`、`write` 调用后也会刷新。它用 `git status --no-optional-locks`，不会锁住 index。
 - 设置 `"icons": "nerd"` 后，各段带 Nerd Font 图标，胶囊两端变成圆角。设置 `"statusBar": "plain"` 后不画底色，只显示彩色文字。
+- 设置 `"statusBar": "bar"` 后画一行全宽实底，两端不带圆角。设置 `"statusBar": "rail"` 后不画底色，左右两组之间用暗色横线连接。终端太窄时，两种样式都回退成普通文本。
+- 设置 `"statusBar": "panel"` 后画一个占满宽度的三行方框。上边框开头是模型名和思考等级，后面是目录、git 计数和会话名。中间行是 `ctx` 上下文条、token、缓存命中率和费用。下边框显示运行中的子代理数。边框取上下文水位色。终端变窄时，按会话名、git 计数、分支、目录、模型名的顺序丢段。低于 24 列时，方框回退成普通文本。
 - 终端太窄时，footer 按以下顺序隐藏内容：缓存命中率、会话名、git 计数、token、上下文总量、费用。
 - 扩展状态（例如 goal、plan mode）显示在第二行。没有状态时不显示这一行。
 
@@ -88,7 +90,7 @@
    pi install git:github.com/szxypi/pi-warm-ui
    ```
 
-   要固定版本，就在后面加 tag：`git:github.com/szxypi/pi-warm-ui@v0.4.2`。
+   要固定版本，就在后面加 tag：`git:github.com/szxypi/pi-warm-ui@v0.5.0`。
 
 2. 启动 pi。布局立即生效。
 3. 打开 `/settings`，选择 **Theme**，再从五个主题里选一个。
@@ -152,7 +154,7 @@ pi 启动时和运行 `/reload` 时，扩展读取 `~/.pi/agent/warm-ui.json`。
 | `userMessages` | 设为 `false` 时去掉用户消息的竖条。 |
 | `prompt` | 输入内容前的提示符，例如 `">"` 或 `"›"`。设为 `""` 时不显示。 |
 | `icons` | `"nerd"` 使用 Nerd Font 图标。`"unicode"` 使用普通符号和短标签。`"none"` 只用标签。 |
-| `statusBar` | `"band"` 在主题的状态栏底色上画 footer。`"plain"` 只显示彩色文字。 |
+| `statusBar` | `"band"` 在主题的状态栏底色上画 footer。`"plain"` 只显示彩色文字。`"bar"` 画一行全宽实底。`"rail"` 不画底色，左右两组之间用暗色横线连接。`"panel"` 画一个占满宽度的三行方框，开头是模型名与思考等级，边框取上下文水位色。 |
 
 无论怎么设置，主题都照常可用。
 
@@ -166,6 +168,7 @@ pi 启动时和运行 `/reload` 时，扩展读取 `~/.pi/agent/warm-ui.json`。
 |---|---|
 | `/warm-ui off` | 恢复 pi 自带的 footer、输入框、工具行和用户消息，直到 pi 退出。 |
 | `/warm-ui on` | 重新启用布局。 |
+| `/warm-ui style <name>` | 在当前会话切换状态栏样式：`band`、`plain`、`bar`、`rail` 或 `panel`。只运行 `/warm-ui style` 时显示当前样式和可选项。 |
 | `/warm-ui` | 显示当前状态。 |
 
 已经显示在屏幕上的工具行保持原样。运行 `/reload` 重新绘制。

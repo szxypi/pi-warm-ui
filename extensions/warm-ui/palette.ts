@@ -67,10 +67,13 @@ function derive(theme: Theme): Palette {
 	};
 }
 
-const cache = new WeakMap<Theme, Palette>();
+// pi gives the footer a Proxy that always reads the current theme, so the object itself never changes.
+// theme.colors is one frozen object per Theme instance. Keying on it makes the palette follow a theme switch.
+const cache = new WeakMap<object, Palette>();
 
 export function paletteFor(theme: Theme): Palette {
-	const hit = cache.get(theme);
+	const key = theme.colors;
+	const hit = cache.get(key);
 	if (hit) return hit;
 	const fallback = derive(theme);
 	const entry = theme.name ? loadRaw()[theme.name] : undefined;
@@ -90,6 +93,6 @@ export function paletteFor(theme: Theme): Palette {
 			}
 		}
 	}
-	cache.set(theme, palette);
+	cache.set(key, palette);
 	return palette;
 }

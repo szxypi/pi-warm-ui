@@ -10,7 +10,8 @@
  * - User messages: an accent bar on the left edge. Collapsed thinking blocks get an icon.
  *
  * Configuration: <agent dir>/warm-ui.json (see config.ts). "/warm-ui on|off" switches everything
- * until pi exits. Tool rows that are already drawn keep their style until /reload.
+ * until pi exits. "/warm-ui style band|plain|bar|rail|panel" switches the status bar style for this session.
+ * Tool rows that are already drawn keep their style until /reload.
  */
 import type { ExtensionAPI, ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { loadConfig } from "./config.ts";
@@ -21,10 +22,20 @@ import { icons } from "./icons.ts";
 import { installUserMessageBar } from "./messages.ts";
 import { createToolResolver } from "./tools.ts";
 
+const STYLES = ["band", "plain", "bar", "rail", "panel"] as const;
+type StatusBarStyle = typeof STYLES[number];
+
 export default function (pi: ExtensionAPI) {
+	// Shared state outlives /reload. Initialised once per pi process.
+	const shared = ((globalThis as any)[Symbol.for("pi-warm-ui.state")] ??= {
+		enabled: true,
+		statusBarOverride: undefined as StatusBarStyle | undefined,
+	}) as { enabled: boolean; statusBarOverride: StatusBarStyle | undefined };
+
 	const config = loadConfig();
-	// The on/off switch outlives /reload, which loads a fresh instance of this module.
-	const shared = ((globalThis as any)[Symbol.for("pi-warm-ui.state")] ??= { enabled: true }) as { enabled: boolean };
+	// Apply session-level style override (set by /warm-ui style, survives /reload, cleared on pi exit).
+	if (shared.statusBarOverride !== undefined) config.statusBar = shared.statusBarOverride;
+
 	let theme: (() => Theme) | undefined;
 
 	if (config.tools) pi.registerToolRenderer(createToolResolver(() => shared.enabled));
@@ -83,11 +94,36 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.registerCommand("warm-ui", {
-		description: "Switch the warm-ui layout on or off until pi exits",
+		description: "Switch the warm-ui layout on or off, or choose a status bar style, until pi exits",
 		handler: async (args, ctx) => {
 			const arg = args.trim().toLowerCase();
+
+			// /warm-ui style [band|plain|bar|rail]
+			if (arg === "style" || arg.startsWith("style ")) {
+				const name = arg.slice("style".length).trim();
+				if (!name) {
+					const current = shared.statusBarOverride ?? config.statusBar;
+					ctx.ui.notify(`status bar style: ${current}\nOptions: ${STYLES.join(" | ")}`, "info");
+					return;
+				}
+				if (!STYLES.includes(name as StatusBarStyle)) {
+					ctx.ui.notify(`Unknown style "${name}". Options: ${STYLES.join(" | ")}`, "error");
+					return;
+				}
+				shared.statusBarOverride = name as StatusBarStyle;
+				// Update the live config object so the footer re-reads it on the next render frame.
+				// No applyLayout needed: footer.ts reads config dynamically on every render call.
+				config.statusBar = name as StatusBarStyle;
+				requestRender();
+				ctx.ui.notify(`Status bar style set to "${name}" for this session.`, "info");
+				return;
+			}
+
 			if (arg !== "on" && arg !== "off") {
-				ctx.ui.notify(`warm-ui is ${shared.enabled ? "on" : "off"}. Usage: /warm-ui on|off`, "info");
+				ctx.ui.notify(
+					`warm-ui is ${shared.enabled ? "on" : "off"}. Usage: /warm-ui on|off|style [${STYLES.join("|")}]`,
+					"info",
+				);
 				return;
 			}
 			shared.enabled = arg === "on";
