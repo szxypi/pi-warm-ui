@@ -9,8 +9,9 @@
  * highlighting and "ctrl+o to expand" keep working. Subagent runs get their own body.
  */
 import type { Theme, ToolRendererResolver, ToolRenderers } from "@earendil-works/pi-coding-agent";
+import { keyHint } from "@earendil-works/pi-coding-agent";
 import type { Component } from "@earendil-works/pi-tui";
-import { Text } from "@earendil-works/pi-tui";
+import { Text, truncateToWidth } from "@earendil-works/pi-tui";
 import { describeTool, previewArgs, stripCd } from "./describe.ts";
 import { firstLine, formatDuration, spread, str, trimBlank } from "./format.ts";
 import { isSubagentDetails, renderSubagentBody, subagentSummary } from "./subagent.ts";
@@ -134,6 +135,27 @@ function fallbackBody(result: ToolResult, options: ResultOptions, theme: Theme):
 	return new Text(text, 0, 0);
 }
 
+/** Hide the script output and nested-call list, even when a single JSON item would wrap for pages. */
+function collapsedCodemodeBody(result: ToolResult, options: ResultOptions, theme: Theme, isError: boolean): Component {
+	const details = result.details as { calls?: { status?: string }[] } | undefined;
+	const calls = Array.isArray(details?.calls) ? details.calls : [];
+	const failed = calls.filter((call) => call.status === "error").length;
+	const running = calls.filter((call) => call.status === "running").length;
+	const cancelled = calls.filter((call) => call.status === "cancelled").length;
+	const status = isError ? "failed" : options.isPartial ? "running" : "done";
+	const parts = [theme.fg(isError ? "error" : options.isPartial ? "warning" : "dim", status)];
+	if (calls.length) parts.push(theme.fg("dim", `${calls.length} ${calls.length === 1 ? "call" : "calls"}`));
+	if (failed) parts.push(theme.fg("error", `${failed} failed`));
+	if (running) parts.push(theme.fg("warning", `${running} running`));
+	if (cancelled) parts.push(theme.fg("muted", `${cancelled} cancelled`));
+	parts.push(keyHint("app.tools.expand", "to expand"));
+	const summary = parts.join(theme.fg("dim", " · "));
+	return {
+		render: (width) => [truncateToWidth(summary, Math.max(0, width))],
+		invalidate() {},
+	};
+}
+
 function diffStats(diff: string): { added: number; removed: number } {
 	let added = 0;
 	let removed = 0;
@@ -183,8 +205,8 @@ function makeRenderCall(toolName: string, base: ToolRenderers | undefined): Rend
 			if ((toolName === "bash" || toolName === "powershell") && ctx.expanded && command && firstLine(command).more > 0) {
 				row.gutter.body = new Text(theme.fg("text", stripCd(command, ctx.cwd).trim()), 0, 0);
 			}
-			// The written content is a preview inside pi's write call component. Keep it as the body.
-			if (toolName === "write" && base?.renderCall) {
+			// Keep write previews, and restore the full codemode script only when expanded.
+			if ((toolName === "write" || (toolName === "codemode" && ctx.expanded)) && base?.renderCall) {
 				row.head = base.renderCall(args, theme, { ...ctx, lastComponent: st.wuBaseCall });
 				st.wuBaseCall = row.head;
 			}
@@ -218,6 +240,13 @@ function makeRenderResult(toolName: string, base: ToolRenderers | undefined): Re
 		const gutter = ctx.lastComponent instanceof Gutter ? ctx.lastComponent : new Gutter();
 		if (toolName === "subagent" && isSubagentDetails(result.details)) {
 			gutter.body = renderSubagentBody(result.details, options, theme, ctx.cwd);
+		} else if (toolName === "codemode" && !options.expanded) {
+			// An expanded streaming renderer may have started its own timer. Finalize it even
+			// if the user folded the row before completion, without showing its output.
+			if (st.wuBaseResult && base?.renderResult && (!options.isPartial || ctx.isError)) {
+				st.wuBaseResult = base.renderResult(result, options, theme, { ...ctx, lastComponent: st.wuBaseResult });
+			}
+			gutter.body = collapsedCodemodeBody(result, options, theme, ctx.isError);
 		} else if (base?.renderResult) {
 			gutter.body = base.renderResult(result, options, theme, { ...ctx, lastComponent: st.wuBaseResult });
 			st.wuBaseResult = gutter.body;

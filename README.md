@@ -45,6 +45,7 @@ The screenshots use `"icons": "nerd"` and the JetBrainsMono Nerd Font.
 - The right side shows the duration of a live run, the diff stats of an edit, the line count of a read and the exit code of a failed command.
 - Shell commands lose a leading `cd <working directory> &&`. Paths inside the working directory are relative.
 - Result bodies come from each tool's own renderer, so previews, diffs, syntax highlighting and `ctrl+o` expansion keep working. Other tools (MCP, extensions) get the same header and indented output.
+- `codemode` is folded by default: the header shows the script's line count, and a single summary row shows its status, nested-call count and any failures. `ctrl+o` reveals the full script, nested calls and output. This only changes the display, not the result the model receives.
 
 **Subagent runs**
 
@@ -115,7 +116,7 @@ Requires pi 1.0 or later. It was tested with pi 1.0.2.
    pi install git:github.com/szxypi/pi-warm-ui
    ```
 
-   To pin a version, add a tag: `git:github.com/szxypi/pi-warm-ui@v0.6.0`.
+   To pin a version, add a tag: `git:github.com/szxypi/pi-warm-ui@v0.6.1`.
 
 2. Start pi. The layout is active immediately.
 3. Open `/settings`, select **Theme**, then select one of the five themes.

@@ -27,6 +27,12 @@ export function describeTool(name: string, args: any, cwd: string, theme: Theme)
 			if (args?.timeout) text += theme.fg("dim", `  timeout ${args.timeout}s`);
 			return text;
 		}
+		case "codemode": {
+			const code = str(args?.code);
+			if (code === undefined) return theme.fg("dim", "…");
+			const lines = code.trim() ? code.trim().split("\n").length : 0;
+			return theme.fg("dim", `${lines} ${lines === 1 ? "line" : "lines"} of JavaScript`);
+		}
 		case "read": {
 			let text = theme.fg("text", p(args?.path ?? args?.file_path));
 			const offset = typeof args?.offset === "number" ? args.offset : undefined;
