@@ -2,6 +2,7 @@ import { CustomEditor, type ExtensionAPI, type ExtensionContext, type Keybinding
 import type { EditorTheme, TUI, TuiMouseEvent, TuiMouseEventResult } from "@earendil-works/pi-tui";
 import { visibleWidth } from "@earendil-works/pi-tui";
 import type { Config } from "./config.ts";
+import { fitFrameLines, frameWidth } from "./frame.ts";
 import { icons } from "./icons.ts";
 
 type EditorFactory = Parameters<ExtensionContext["ui"]["setEditorComponent"]>[0];
@@ -38,8 +39,10 @@ export function createEditor(pi: ExtensionAPI, ctx: ExtensionContext, config: Co
 		}
 
 		render(width: number): string[] {
+			width = frameWidth(width);
+			if (!width) return [""];
 			const shift = this.promptShift(width);
-			if (!shift) return super.render(width);
+			if (!shift) return fitFrameLines(super.render(width), width);
 			const inner = width - shift;
 			let lines: string[];
 			this.outerWidth = width;
@@ -54,12 +57,12 @@ export function createEditor(pi: ExtensionAPI, ctx: ExtensionContext, config: Co
 			const input = this.getText().trimStart();
 			const symbol = input.startsWith("!") ? this.borderColor(config.prompt) : ctx.ui.theme.fg("accent", config.prompt);
 			const indent = " ".repeat(shift);
-			return lines.map((line, i) => {
+			return fitFrameLines(lines.map((line, i) => {
 				// Row 0 is the top border and row rows + 1 the bottom border. Both already have the full width.
 				if (i === 0 || i === rows + 1) return line;
 				const head = i === 1 ? `${symbol} ` : indent;
 				return line.slice(0, padX) + head + line.slice(padX);
-			});
+			}), width);
 		}
 
 		handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {

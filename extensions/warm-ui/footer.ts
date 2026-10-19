@@ -38,6 +38,7 @@ import type { ExtensionContext, Theme } from "@earendil-works/pi-coding-agent";
 import { type Color, mixColors, rgbColor, sliceByColumn, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Config } from "./config.ts";
 import { formatTokens } from "./format.ts";
+import { fitFrameLines, frameWidth } from "./frame.ts";
 import { type GitStatus, type GitTracker, isDirty } from "./git.ts";
 import { type Icons, icons, withIcon } from "./icons.ts";
 import { type Palette, paletteFor } from "./palette.ts";
@@ -585,7 +586,7 @@ export function createFooter(ctx: ExtensionContext, deps: FooterDeps): FooterFac
 			dispose: unsub,
 			invalidate() {},
 			render(fullWidth: number): string[] {
-				const total = Math.floor(fullWidth);
+				const total = frameWidth(fullWidth);
 				if (!(total > 0)) return [""];
 
 				const ic = icons(config.icons);
@@ -778,7 +779,7 @@ export function createFooter(ctx: ExtensionContext, deps: FooterDeps): FooterFac
 						.filter(Boolean);
 					const lines = [...panel.lines];
 					if (statuses.length) lines.push(truncateToWidth(statuses.join("   "), total, "…"));
-					return lines;
+					return fitFrameLines(lines, total);
 				}
 				if (fit) {
 					margin = fit.rung.margin;

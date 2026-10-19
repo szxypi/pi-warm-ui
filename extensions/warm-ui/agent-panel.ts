@@ -1,7 +1,7 @@
 /**
- * The agent panel: a rounded box above the input that lists the tool calls of the current turn.
+ * The agent panel: a persistent rounded box above the input with the latest user request's tools.
  *
- *   ╭─ ● main  glm-5.3 · max ──────────────────────────────────────────────── [-] ─╮
+ *   ╭────────────────────────────────────────────────────────────────────── [-] ─╮
  *   │ ● bash   sleep 5                                                   3s       │
  *   │   │ ✓ read  src/rate-limit.js                                      0.4s     │
  *   │ ✓ edit  src/rate-limit.js   +1 −1                                  0.2s     │
@@ -9,25 +9,26 @@
  *
  * Collapsed, it keeps the top border only and shows how many calls the turn made:
  *
- *   ╭─ ● main  glm-5.3 · max ─────────────────────────────── 󰚩 3  [+] ─╮
+ *   ╭───────────────────────────────────────────────────── 󰚩 3  [+] ─╮
  *
- * The panel mounts on the first tool call and goes away at the end of the turn. A click on the top
+ * The panel stays mounted while idle and keeps the last run's calls until the next run starts. Its
+ * rainbow frame flows while the agent is busy and freezes when it settles. A click on the top
  * border toggles the fold. pi has no subagent entity, so the rows come from the tool events that
  * index.ts records; a call that another tool made (parentToolCallId) is indented one level.
  *
  * Width: a row gives up its argument summary first, then its duration, then it truncates the tool
- * name. Below AGENT_PANEL_MIN_WIDTH only the top border draws. The box takes its colors from the
- * theme and the status bar palette, so all five themes work, and the icon sets differ only in the
+ * name. Below AGENT_PANEL_MIN_WIDTH only the top border draws. The rainbow adapts to the theme's
+ * light/dark appearance, and the content uses the status bar palette. The icon sets differ only in the
  * glyphs they draw.
  */
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Component, TUI, TuiMouseEvent, TuiMouseEventResult } from "@earendil-works/pi-tui";
-import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { rgbColor, truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
 import type { Config } from "./config.ts";
 import { describeTool, previewArgs } from "./describe.ts";
 import { firstLine, str } from "./format.ts";
+import { fitFrameLines, frameWidth } from "./frame.ts";
 import { type Icons, icons } from "./icons.ts";
-import { type Palette, paletteFor } from "./palette.ts";
 
 /** Rows that an expanded panel shows, the "… +N more" line included. */
 export const AGENT_PANEL_MAX_ROWS = 6;
@@ -36,9 +37,48 @@ export const AGENT_PANEL_MIN_WIDTH = 30;
 /** Columns that a tool name keeps before it is cut. */
 const NAME_MIN = 4;
 
-export type AgentStatus = "running" | "done" | "error";
+export type AgentStatus = "running" | "done" | "error" | "stopped";
 
-/** One tool call of the current turn. index.ts fills this from the tool events. */
+/** One color step every 100 ms; four columns per color keeps ANSI traffic modest. */
+export const AGENT_PANEL_FRAME_MS = 100;
+const RAINBOW_CELL_WIDTH = 4;
+const RAINBOW_DARK = [0xef7777, 0xefa45f, 0xe7cd66, 0x85c982, 0x72c7d1, 0x89a9ed, 0xc59ae8];
+const RAINBOW_LIGHT = [0xb83245, 0xa75413, 0x806b00, 0x347638, 0x007783, 0x365eb1, 0x8746ad];
+const rainbowColors = (values: number[]) => values.map((n) => rgbColor(n >> 16, (n >> 8) & 255, n & 255));
+const RAINBOW = { dark: rainbowColors(RAINBOW_DARK), light: rainbowColors(RAINBOW_LIGHT) };
+
+type BorderPaint = (text: string, x: number, y: number) => string;
+
+/** Walk clockwise around the frame so corners and side edges share the same moving gradient. */
+function rainbowBorder(input: AgentPanelInput, width: number, height: number): BorderPaint {
+	const colors = RAINBOW[input.theme.appearance === "light" ? "light" : "dark"];
+	const running = input.running ?? input.calls.some((call) => call.status === "running");
+	const phase = input.borderPhase ?? (running ? Math.floor(input.now / AGENT_PANEL_FRAME_MS) : 0);
+	return (text, x, y) => {
+		let out = "";
+		let run = "";
+		let last = -1;
+		const flush = () => {
+			if (run) out += input.theme.style(run, { fg: colors[last] });
+			run = "";
+		};
+		for (const char of text) {
+			const at = y === 0 ? x : y === height - 1 ? width - 1 + height - 1 + width - 1 - x
+				: x === width - 1 ? width - 1 + y : 2 * (width - 1) + height - 1 + height - 1 - y;
+			const index = ((Math.floor(at / RAINBOW_CELL_WIDTH) + phase) % colors.length + colors.length) % colors.length;
+			if (index !== last) {
+				flush();
+				last = index;
+			}
+			run += char;
+			x++;
+		}
+		flush();
+		return out;
+	};
+}
+
+/** One tool call of the latest agent run. index.ts fills this from the tool events. */
 export interface AgentCall {
 	id: string;
 	name: string;
@@ -56,17 +96,16 @@ export interface AgentCall {
 export interface AgentPanelInput {
 	/** Terminal width. Every returned line is exactly this wide. */
 	width: number;
-	/** Calls of the current turn, in the order they started. */
+	/** Calls of the latest agent run, in the order they started. */
 	calls: readonly AgentCall[];
 	collapsed: boolean;
-	/** Current model id, or "" when pi reports none. */
-	model: string;
-	/** Current thinking level, or undefined when the model does not think or the level is "off". */
-	effort: string | undefined;
 	/** Milliseconds, for the live duration of a running call. */
 	now: number;
+	/** Busy for the whole agent run, including thinking and text streaming without tools. */
+	running?: boolean;
+	/** Frozen at settlement, so unrelated renders cannot move an idle border. */
+	borderPhase?: number;
 	theme: Theme;
-	pal: Palette;
 	ic: Icons;
 	/** The "none" icon set draws no agent glyph. */
 	showAgentIcon: boolean;
@@ -86,7 +125,7 @@ export function agentDuration(ms: number): string {
 	return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}m`;
 }
 
-const statusGlyph = (status: AgentStatus) => (status === "running" ? "●" : status === "error" ? "✗" : "✓");
+const statusGlyph = (status: AgentStatus) => (status === "running" ? "●" : status === "error" ? "✗" : status === "stopped" ? "■" : "✓");
 
 /**
  * The label and the plain summary of a call. A subagent call shows its agent name and its task
@@ -109,50 +148,24 @@ function describeCall(call: AgentCall, theme: Theme): { label: string; summary: 
 function dotPaint(status: AgentStatus, theme: Theme): (text: string) => string {
 	if (status === "running") return (text) => theme.fg("accent", text);
 	if (status === "error") return (text) => theme.fg("error", text);
+	if (status === "stopped") return (text) => theme.fg("warning", text);
 	return (text) => theme.fg("success", text);
 }
 
-/**
- * The top border: the status dot and "main" with the model and the level, then the fold marker. The
- * call count sits next to the marker when the panel is collapsed. When the width is tight the border
- * drops the level, then the model, so the marker and the fill always fit.
- */
-function topBorder(input: AgentPanelInput, width: number): string {
-	const { theme, pal, ic, calls, collapsed, model, effort } = input;
-	const running = calls.some((call) => call.status === "running");
-	const paint = (text: string) => theme.fg("borderMuted", text);
-	const dot = dotPaint(running ? "running" : "done", theme)("●");
-	const main = theme.style(" main", { fg: pal.model, bold: true });
+/** A clean top edge: only the right-aligned fold marker and, when collapsed, the call count. */
+function topBorder(input: AgentPanelInput, width: number, border: BorderPaint): string {
+	if (width === 1) return border("─", 0, 0);
+	const { theme, ic, calls, collapsed } = input;
+	const marker = collapsed ? "[+]" : "[-]";
+	if (width < 9) return border("╭" + "─".repeat(width - 2) + "╮", 0, 0);
 
-	const count: string[] = [];
-	if (collapsed) {
-		const glyph = input.showAgentIcon && ic.subagents ? `${ic.subagents} ` : "";
-		count.push(theme.fg("muted", `${glyph}${calls.length}`));
-	}
-	count.push(theme.fg("muted", collapsed ? "[+]" : "[-]"));
-	const rightText = count.join(theme.fg("dim", "  "));
-	const rightW = visibleWidth(rightText) + 2;
-
-	// The left group gives up the level first, then the model.
-	const names = [model && effort ? `${model} · ${effort}` : model, model, ""];
-	for (const name of names) {
-		const glyph = name && ic.model ? `${ic.model} ` : "";
-		const leftText = dot + main + (name ? theme.fg("muted", `  ${glyph}${name}`) : "");
-		const fill = width - 4 - (visibleWidth(leftText) + 2) - rightW;
-		if (fill >= 0) {
-			return paint("╭─") + ` ${leftText} ` + paint("─".repeat(fill)) + ` ${rightText} ` + paint("─╮");
-		}
-	}
-	// Even the bare "● main" does not fit next to the marker. Keep the marker and cut the left group.
-	const leftText = truncateToWidth(dot + main, Math.max(0, width - 4 - rightW), "…");
-	const fill = width - 4 - visibleWidth(leftText) - 2 - rightW;
-	return (
-		paint("╭─") +
-		(leftText ? ` ${leftText} ` : paint("─")) +
-		paint("─".repeat(Math.max(0, fill))) +
-		` ${rightText} ` +
-		paint("─╮")
-	);
+	const glyph = input.showAgentIcon && ic.subagents ? `${ic.subagents} ` : "";
+	const count = collapsed ? theme.fg("muted", `${glyph}${calls.length}  `) : "";
+	let right = count + theme.fg("muted", marker);
+	// A narrow frame drops the count before it drops the fold control.
+	if (visibleWidth(right) + 7 > width) right = theme.fg("muted", marker);
+	const lead = width - visibleWidth(right) - 4;
+	return border("╭" + "─".repeat(lead - 1), 0, 0) + ` ${right} ` + border("─╮", width - 2, 0);
 }
 
 /** The fixed parts of one row: the tree prefix, the status glyph and the agent glyph. */
@@ -216,35 +229,44 @@ function pickRows(calls: readonly AgentCall[]): { shown: AgentCall[]; hidden: nu
 
 /** Draw the panel. Every line is exactly `input.width` columns. */
 export function renderAgentPanel(input: AgentPanelInput): string[] {
-	const width = Math.floor(input.width);
-	if (!(width > 0)) return [""];
-	if (width < AGENT_PANEL_MIN_WIDTH) return [topBorder(input, width)];
-
-	const top = topBorder(input, width);
-	if (input.collapsed) return [top];
-
+	const width = frameWidth(input.width);
+	if (!width) return [""];
+	const compact = input.collapsed || width < AGENT_PANEL_MIN_WIDTH;
 	const { shown, hidden } = pickRows(input.calls);
-	const border = (text: string) => input.theme.fg("borderMuted", text);
+	const height = compact ? 1 : shown.length + (hidden ? 1 : 0) + 2;
+	const border = rainbowBorder(input, width, height);
+	const top = topBorder(input, width, border);
+	if (compact) return fitFrameLines([top], width);
+
 	const lines = [top];
+	const row = (body: string) => {
+		const y = lines.length;
+		lines.push(border("│", 0, y) + " " + body + " " + border("│", width - 1, y));
+	};
 	// Each row fits on its own, so a long call never starves a short one.
-	for (const call of shown) lines.push(border("│") + " " + callRow(input, call, width) + " " + border("│"));
+	for (const call of shown) row(callRow(input, call, width));
 	if (hidden > 0) {
 		const text = input.theme.fg("dim", `… +${hidden} more`);
-		lines.push(border("│") + " " + text + " ".repeat(Math.max(0, width - 4 - visibleWidth(text))) + " " + border("│"));
+		row(text + " ".repeat(Math.max(0, width - 4 - visibleWidth(text))));
 	}
-	lines.push(border("╰") + border("─".repeat(Math.max(0, width - 2))) + border("╯"));
-	return lines;
+	lines.push(border("╰" + "─".repeat(width - 2) + "╯", 0, height - 1));
+	return fitFrameLines(lines, width);
 }
 
 /** The state that the panel renders. index.ts feeds it from the tool events. */
 export interface AgentPanelStore {
 	calls: Map<string, AgentCall>;
 	collapsed: boolean;
+	/** Start a user request; retain calls across its model turns and tool batches. */
+	begin(now: number): void;
+	/** Freeze the frame and finish interrupted tools without reporting false success. */
+	settle(now: number): void;
+	phase(now: number): number;
 	start(event: { toolCallId: string; toolName: string; args: any; parentToolCallId?: string }, cwd: string, now: number): void;
 	end(event: { toolCallId: string; isError: boolean; durationMs?: number }, now: number): void;
 	clear(): void;
 	running(): boolean;
-	/** Number of calls in the current turn. */
+	/** Number of calls in the latest agent run. */
 	size(): number;
 	/** Calls in start order, with the duration of a finished call filled in. */
 	list(): AgentCall[];
@@ -252,9 +274,28 @@ export interface AgentPanelStore {
 
 export function createAgentPanelStore(): AgentPanelStore {
 	const calls = new Map<string, AgentCall>();
+	let active = false;
+	let frozenPhase = 0;
 	const store: AgentPanelStore = {
 		calls,
 		collapsed: false,
+		begin(_now) {
+			// Automatic continuation can start another agent cycle before final settlement.
+			if (!active) calls.clear();
+			active = true;
+		},
+		settle(now) {
+			frozenPhase = store.phase(now);
+			active = false;
+			for (const call of calls.values()) {
+				if (call.status !== "running") continue;
+				call.status = "stopped";
+				call.durationMs = Math.max(0, now - call.startedAt);
+			}
+		},
+		phase(now) {
+			return store.running() ? Math.floor(now / AGENT_PANEL_FRAME_MS) : frozenPhase;
+		},
 		start(event, cwd, now) {
 			calls.set(event.toolCallId, {
 				id: event.toolCallId,
@@ -274,9 +315,11 @@ export function createAgentPanelStore(): AgentPanelStore {
 		},
 		clear() {
 			calls.clear();
+			active = false;
+			frozenPhase = 0;
 		},
 		running() {
-			return [...calls.values()].some((call) => call.status === "running");
+			return active || [...calls.values()].some((call) => call.status === "running");
 		},
 		size() {
 			return calls.size;
@@ -291,8 +334,8 @@ export function createAgentPanelStore(): AgentPanelStore {
 export interface AgentPanelDeps {
 	store: AgentPanelStore;
 	config: Config;
-	/** Current model and thinking level, read from the live context. */
-	model: () => { model: string; effort: string | undefined };
+	/** Give the owner a redraw callback instead of replacing the widget on every tool event. */
+	onRender?: (request: () => void) => void;
 }
 
 /**
@@ -301,23 +344,23 @@ export interface AgentPanelDeps {
  */
 export function createAgentPanel(deps: AgentPanelDeps): (tui: TUI, theme: Theme) => Component {
 	return (tui, theme) => {
-		// A running call ticks once a second, so its duration keeps up without new events.
+		deps.onRender?.(() => tui.requestRender());
+		// Idle ticks do not redraw; model thinking and streaming animate even without a running tool.
 		const timer = setInterval(() => {
 			if (deps.store.running()) tui.requestRender();
-		}, 1000);
+		}, AGENT_PANEL_FRAME_MS);
+		timer.unref?.();
 		return {
 			render(width: number): string[] {
-				const { model, effort } = deps.model();
+				const now = Date.now();
 				return renderAgentPanel({
 					width,
 					calls: deps.store.list(),
 					collapsed: deps.store.collapsed,
-					model,
-					effort,
-					now: Date.now(),
+					now,
+					running: deps.store.running(),
+					borderPhase: deps.store.phase(now),
 					theme,
-					// pi hands the factory a theme proxy, so this follows a theme switch on the next frame.
-					pal: paletteFor(theme),
 					ic: icons(deps.config.icons),
 					showAgentIcon: deps.config.icons !== "none",
 				});
@@ -332,6 +375,7 @@ export function createAgentPanel(deps: AgentPanelDeps): (tui: TUI, theme: Theme)
 			invalidate() {},
 			dispose() {
 				clearInterval(timer);
+				deps.onRender?.(() => {});
 			},
 		};
 	};

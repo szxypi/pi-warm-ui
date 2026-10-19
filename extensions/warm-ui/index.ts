@@ -41,10 +41,6 @@ export default function (pi: ExtensionAPI) {
 	if (shared.statusBarOverride !== undefined) config.statusBar = shared.statusBarOverride;
 
 	let theme: (() => Theme) | undefined;
-	// The live extension context. pi marks it stale after /reload and a session switch, so reads are
-	// guarded: session_start replaces it and session_shutdown clears it.
-	let live: ExtensionContext | undefined;
-
 	if (config.tools) pi.registerToolRenderer(createToolResolver(() => shared.enabled));
 	if (config.userMessages) installUserMessageBar({ enabled: () => shared.enabled, theme: () => theme?.() });
 
@@ -54,29 +50,29 @@ export default function (pi: ExtensionAPI) {
 	const running = new Map<string, number>();
 	const agents = () => [...running.values()].reduce((a, b) => a + b, 0);
 
-	// The agent panel: the tool calls of the current turn, above the input. The store holds the rows so
-	// the widget component stays stateless; the panel shows from the first call until the turn ends.
+	// Keep the panel mounted while idle. A user request may contain many model turns: retain its tool
+	// rows until the next agent_start, and animate for the whole run rather than only during tools.
 	const panelStore = createAgentPanelStore();
-	/** Current model and thinking level, read live so /model and shift+tab show on the next frame. */
-	const readModel = (): { model: string; effort: string | undefined } => {
-		try {
-			const model = live?.model;
-			const id = model?.id ?? model?.name ?? "";
-			const level = live?.thinkingLevel;
-			return { model: id, effort: model?.reasoning && level && level !== "off" ? level : undefined };
-		} catch {
-			return { model: "", effort: undefined };
-		}
-	};
+	let panelMounted = false;
+	let requestPanelRender = () => {};
 	// The factory gets the theme proxy from pi, so the panel follows a theme switch without a palette hook.
-	const panelFactory = createAgentPanel({ store: panelStore, config, model: readModel });
+	const panelFactory = createAgentPanel({
+		store: panelStore, config,
+		onRender: (request) => (requestPanelRender = request),
+	});
 	const syncPanel = (ctx: ExtensionContext) => {
+		if (ctx.mode !== "tui") return;
 		if (!shared.enabled || !config.enabled || !config.agentPanel) {
-			ctx.ui.setWidget(AGENT_PANEL_KEY, undefined);
+			if (panelMounted) ctx.ui.setWidget(AGENT_PANEL_KEY, undefined);
+			panelMounted = false;
 			return;
 		}
-		// The store keeps the rows; the widget only draws them. Re-setting replaces the old component.
-		ctx.ui.setWidget(AGENT_PANEL_KEY, panelFactory, { placement: "aboveEditor" });
+		// Replacing a widget disposes its component and animation timer. Mount once, then only redraw.
+		if (!panelMounted) {
+			ctx.ui.setWidget(AGENT_PANEL_KEY, panelFactory, { placement: "aboveEditor" });
+			panelMounted = true;
+		}
+		requestPanelRender();
 	};
 
 	const applyLayout = (ctx: ExtensionContext) => {
@@ -87,21 +83,22 @@ export default function (pi: ExtensionAPI) {
 			git?.stop();
 			ctx.ui.setFooter(undefined);
 			ctx.ui.setEditorComponent(undefined);
-			ctx.ui.setWidget(AGENT_PANEL_KEY, undefined);
+			syncPanel(ctx);
 			return;
 		}
 		git ??= new GitTracker(pi, () => ctx.sessionManager.getCwd(), () => requestRender());
 		git.start(10_000);
 		ctx.ui.setFooter(createFooter(ctx, { config, git, agents, onRender: (r) => (requestRender = r) }));
 		ctx.ui.setEditorComponent(createEditor(pi, ctx, config));
+		syncPanel(ctx);
 	};
 
 	pi.on("session_start", (_event, ctx) => {
 		if (ctx.mode !== "tui") return;
-		live = ctx;
 		theme = () => ctx.ui.theme;
 		running.clear();
 		panelStore.clear();
+		panelMounted = false;
 		applyLayout(ctx);
 	});
 
@@ -109,33 +106,42 @@ export default function (pi: ExtensionAPI) {
 		git?.stop();
 		git = undefined;
 		// pi invalidates ctx right after this event. Renders and callbacks that run later must not read it.
-		live = undefined;
 		theme = undefined;
 		requestRender = () => {};
+		requestPanelRender = () => {};
+		panelMounted = false;
 		panelStore.clear();
 	});
 
-	// Refresh git status after anything that may touch files. The agent panel keeps its rows until the
-	// turn ends, then the next turn starts with an empty panel.
-	pi.on("turn_end", (_event, ctx) => {
+	pi.on("agent_start", (_event, ctx) => {
+		if (ctx.mode !== "tui") return;
+		panelStore.begin(Date.now());
+		syncPanel(ctx);
+	});
+	// agent_end can be followed by automatic continuation. Only the final settled boundary freezes
+	// the rainbow and stops any tool row that was interrupted before emitting its end event.
+	pi.on("agent_settled", (_event, ctx) => {
+		if (ctx.mode !== "tui") return;
+		panelStore.settle(Date.now());
+		requestPanelRender();
+	});
+	pi.on("turn_end", () => {
 		git?.refresh();
-		panelStore.clear();
-		ctx.ui.setWidget(AGENT_PANEL_KEY, undefined);
 	});
 	pi.on("tool_execution_end", (event, ctx) => {
 		if (["bash", "edit", "write", "powershell"].includes(event.toolName)) git?.refresh();
 		if (running.delete(event.toolCallId)) requestRender();
-		if (config.agentPanel && panelStore.calls.has(event.toolCallId)) {
+		if (ctx.mode === "tui" && panelStore.calls.has(event.toolCallId)) {
 			panelStore.end(event, Date.now());
-			ctx.ui.setWidget(AGENT_PANEL_KEY, panelFactory, { placement: "aboveEditor" });
+			requestPanelRender();
 		}
 	});
 
 	// Count subagent runs: a parallel call runs one agent per task. Background runs return at once and are not counted.
 	pi.on("tool_execution_start", (event, ctx) => {
 		const args = event.args ?? {};
-		if (config.agentPanel && shared.enabled && config.enabled) {
-			// The panel opens on the first call of the turn. cwd is read here, so a render never reads ctx.
+		if (ctx.mode === "tui") {
+			// cwd is captured at start, so a render never reads the event's potentially stale context.
 			panelStore.start(event, ctx.sessionManager.getCwd(), Date.now());
 			syncPanel(ctx);
 		}
@@ -182,9 +188,8 @@ export default function (pi: ExtensionAPI) {
 					return;
 				}
 				config.agentPanel = name === "on";
-				// Off removes the panel at once. On re-mounts it, so the next call of this turn shows again.
-				if (config.agentPanel && panelStore.size() > 0) syncPanel(ctx);
-				else ctx.ui.setWidget(AGENT_PANEL_KEY, undefined);
+				// On shows the panel even before the first call; off removes it immediately.
+				syncPanel(ctx);
 				ctx.ui.notify(`Agent panel ${name} for this session.`, "info");
 				return;
 			}

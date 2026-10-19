@@ -506,13 +506,12 @@ const PANEL_WIDTHS = [200, 120, 100, 80, 60, 40, 30, 24, 20];
 }
 
 // ── agent panel ──
-// The box above the input that lists the tool calls of the current turn. Pure rendering, so the tests
+// The persistent box above the input lists the latest run's tool calls. Pure rendering, so the tests
 // build the input directly and never touch an extension context.
 {
 	const { loadTs } = await import(path.join(__dirname, "lib/pi-resolve.mjs"));
 	const { loadTheme, BASE } = await import(path.join(__dirname, "lib/fixtures.mjs"));
 	const ap = await loadTs(path.join(EXT_DIR, "warm-ui/agent-panel.ts"));
-	const { paletteFor } = await loadTs(path.join(EXT_DIR, "warm-ui/palette.ts"));
 	const { icons } = await loadTs(path.join(EXT_DIR, "warm-ui/icons.ts"));
 
 	const NOW = 1_700_000_000_000;
@@ -531,19 +530,14 @@ const PANEL_WIDTHS = [200, 120, 100, 80, 60, 40, 30, 24, 20];
 		call("b", "read", "done", { parentId: "a" }),
 		call("c", "edit", "error"),
 	];
-	// `effort` defaults to "max"; pass null to draw the no-level case, because an explicit undefined
-	// would trigger the default parameter.
-	const draw = (themeName, iconSet, width, calls, collapsed = false, model = "glm-5.3", effort = "max") => {
+	const draw = (themeName, iconSet, width, calls, collapsed = false) => {
 		const theme = loadTheme(REPO, themeName);
 		return ap.renderAgentPanel({
 			width,
 			calls,
 			collapsed,
-			model,
-			effort: effort === null ? undefined : effort,
 			now: NOW,
 			theme,
-			pal: paletteFor(theme),
 			ic: icons(iconSet),
 			showAgentIcon: iconSet !== "none",
 		});
@@ -572,9 +566,8 @@ const PANEL_WIDTHS = [200, 120, 100, 80, 60, 40, 30, 24, 20];
 					// A2: the frame.
 					assert(`agent panel opens with ╭─ [${at}]`, plain[0].startsWith("╭─"), JSON.stringify(plain[0].slice(0, 6)));
 					assert(`agent panel closes the top with ─╮ [${at}]`, plain[0].endsWith("─╮"), JSON.stringify(plain[0].slice(-6)));
-					assert(`agent panel top names main [${at}]`, plain[0].includes("main"), JSON.stringify(plain[0].slice(0, 30)));
-					// The model is the first thing the top border gives up when the width is tight.
-					if (width >= 60) assert(`agent panel top shows the model [${at}]`, plain[0].includes("glm-5.3"));
+					assert(`agent panel has no duplicate header [${at}]`, !/main|glm-5\.3| · max|●/.test(plain[0]), JSON.stringify(plain[0]));
+					assert(`agent panel left edge is uninterrupted [${at}]`, /^╭─+ /.test(plain[0]), JSON.stringify(plain[0]));
 					// A3: the fold marker matches the state.
 					assert(`agent panel marker [${at}]`, plain[0].includes(collapsed ? "[+]" : "[-]"), JSON.stringify(plain[0].slice(-20)));
 					if (collapsed) {
@@ -633,11 +626,8 @@ const PANEL_WIDTHS = [200, 120, 100, 80, 60, 40, 30, 24, 20];
 			width: 100,
 			calls: [call("a", "bash", "running")],
 			collapsed: false,
-			model: "glm-5.3",
-			effort: "max",
 			now: NOW + 60_000,
 			theme: loadTheme(REPO, "eyecare-warm"),
-			pal: paletteFor(loadTheme(REPO, "eyecare-warm")),
 			ic: icons("unicode"),
 			showAgentIcon: false,
 		});
@@ -658,13 +648,13 @@ const PANEL_WIDTHS = [200, 120, 100, 80, 60, 40, 30, 24, 20];
 		assert("agent panel draws the top border only below 30", tiny.length === 1 && tiny[0].startsWith("╭─"), JSON.stringify(tiny));
 	}
 
-	// A11: no thinking level means no "·", and no model means no model segment.
+	// A11: model, level, main label and status dot live in the footer, not the agent panel header.
 	{
-		const noLevel = stripAnsi(draw("eyecare-warm", "unicode", 100, CALLS, true, "glm-5.3", null).join("\n"));
-		assert("agent panel shows no dot without a level", !noLevel.includes(" · "), JSON.stringify(noLevel));
-		assert("agent panel keeps the model without a level", noLevel.includes("glm-5.3"));
-		const noModel = stripAnsi(draw("eyecare-warm", "unicode", 100, CALLS, true, "", undefined).join("\n"));
-		assert("agent panel shows main without a model", noModel.includes("main") && !noModel.includes("glm-5.3"));
+		for (const collapsed of [false, true]) {
+			const top = stripAnsi(draw("eyecare-warm", "unicode", 100, CALLS, collapsed)[0]);
+			assert("agent panel has no model/level/main label", !/glm-5\.3|max|main|●| · /.test(top), JSON.stringify(top));
+			assert("agent panel keeps the fold marker on the right", /\[(?:\+|-)\] ─╮$/.test(top), JSON.stringify(top));
+		}
 	}
 
 	// A12: the icon sets. Only nerd and unicode draw the agent glyph; none draws no glyph.
@@ -672,12 +662,13 @@ const PANEL_WIDTHS = [200, 120, 100, 80, 60, 40, 30, 24, 20];
 		const nerd = draw("eyecare-warm", "nerd", 100, CALLS, true).join("");
 		const uni = stripAnsi(draw("eyecare-warm", "unicode", 100, CALLS, true).join(""));
 		const none = stripAnsi(draw("eyecare-warm", "none", 100, CALLS, true).join(""));
-		assert("agent panel nerd draws the model glyph", nerd.includes("\u{F06A9}"));
+		assert("agent panel nerd draws no duplicate model glyph", !nerd.includes("\u{F06A9}"));
+		assert("agent panel nerd keeps the collapsed call-count glyph", nerd.includes(""));
 		assert("agent panel unicode draws no Nerd glyph", !uni.includes("\u{F06A9}") && !uni.includes(""));
 		assert("agent panel none draws no agent glyph", !none.includes("") && !none.includes("agents"), JSON.stringify(none));
 	}
 
-	// A13: the store. Start, end, the running flag and the clear on turn end.
+	// A13: the store. Start, end, the running flag and explicit session reset.
 	{
 		const store = ap.createAgentPanelStore();
 		store.start({ toolCallId: "x", toolName: "bash", args: {} }, "/tmp", 1000);

@@ -26,7 +26,7 @@ export interface Config {
 	prompt: string;
 	/** "model · level" label on the editor bottom border. false keeps a plain border. */
 	modelLabel: boolean;
-	/** The agent panel above the input, listing the tool calls of the current turn. */
+	/** Persistent rainbow-framed panel above the input, listing the latest agent run's tool calls. */
 	agentPanel: boolean;
 }
 

@@ -83,23 +83,24 @@ For the `subagent` tool of [pi-code](https://www.npmjs.com/package/pi-code), and
 
 **Agent panel**
 
-- A rounded box above the input lists the tool calls of the current turn. It appears on the first call and goes away when the turn ends.
+- A rounded box stays above the input, including before the first call and while idle. It keeps the latest request's tool calls across model turns; the next request starts a fresh list.
+- The frame uses seven rainbow colors. It flows while the agent is thinking, streaming text or running tools, then freezes when the run settles or is stopped. Idle ticks do not redraw the terminal. The agent panel, input borders and panel footer share the same left and right columns.
 
   ```
-  ╭─ ● main  glm-5.3 · max ───────────────────────────────────────────── [- ]─╮
+  ╭─────────────────────────────────────────────────────────────────── [-] ─╮
   │ ● bash  rg -n limit src                                           3s      │
   │ │ ✓ read  src/rate-limit.js                                       0.4s    │
   │ ✗ edit  src/rate-limit.js  +1 −1                                  0.2s    │
   ╰───────────────────────────────────────────────────────────────────────────╯
   ```
 
-- The top border carries `● main`, the model and the thinking level, and the fold marker. A call that another tool made (`parentToolCallId`) is indented one level under `│`.
-- The status glyph is `●` while the call runs, `✓` when it succeeds and `✗` when it fails. The tool name is cyan and bold, the summary comes from the same helper that the tool rows use, and the right side shows the elapsed time.
+- The top border only carries the fold marker on the right (plus the call count when collapsed). There is no duplicate main/model/thinking label; model details stay in the footer. A call that another tool made (`parentToolCallId`) is indented one level under `│`.
+- The status glyph is `●` while the call runs, `✓` when it succeeds, `✗` when it fails and `■` if it was interrupted. The tool name is cyan and bold, the summary comes from the same helper that the tool rows use, and the right side shows the elapsed time.
 - A `subagent` call shows the agent name and its task in place of the arguments, with the agent icon.
 - Click anywhere on the top border to fold or unfold. Folded, the border shows the call count next to `[+]`.
 
   ```
-  ╭─ ● main  glm-5.3 · max ───────────────────────────── 󰚩 3  [+] ─╮
+  ╭─────────────────────────────────────────────────── 󰚩 3  [+] ─╮
   ```
 
 - The list stops at six rows. Running calls are kept first, and the last row reads `… +N more`.
