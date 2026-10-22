@@ -21,6 +21,7 @@ import { createFooter } from "./footer.ts";
 import { GitTracker } from "./git.ts";
 import { icons } from "./icons.ts";
 import { installUserMessageBar } from "./messages.ts";
+import { installPanelBottomOrder } from "./panel-order.ts";
 import { createToolResolver } from "./tools.ts";
 
 const STYLES = ["band", "plain", "bar", "rail", "panel"] as const;
@@ -45,6 +46,11 @@ export default function (pi: ExtensionAPI) {
 	let unsubscribePanelEvents: (() => void)[] = [];
 	if (config.tools) pi.registerToolRenderer(createToolResolver(() => shared.enabled));
 	if (config.userMessages) installUserMessageBar({ enabled: () => shared.enabled, theme: () => theme?.() });
+	// Keep the panel directly above the input, below any above-editor widget that mounts later.
+	installPanelBottomOrder({
+		key: AGENT_PANEL_KEY,
+		enabled: () => shared.enabled && config.enabled && config.agentPanel,
+	});
 
 	// Footer state that outlives one render: git status and running subagent calls.
 	let requestRender = () => {};

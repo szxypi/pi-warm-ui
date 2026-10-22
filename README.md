@@ -83,7 +83,7 @@ For the `subagent` tool of [pi-code](https://www.npmjs.com/package/pi-code), and
 
 **Agent panel**
 
-- A persistent rainbow-framed roster sits above the input. Its first body row is always the current main model, for example `main  GPT 6.1 SOL · XHIGH`, including while idle. Model and thinking changes update it live.
+- A persistent rainbow-framed roster sits above the input, directly under any other above-editor widget. Its first body row is always the current main model, for example `main  GPT 6.1 SOL · XHIGH`, including while idle. Model and thinking changes update it live.
 - Main and its directly delegated subagents start at the same left column. Only a subagent's own children are indented, with tree connectors.
 
   ```
